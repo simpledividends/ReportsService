@@ -146,6 +146,7 @@ disable=print-statement,
         too-many-locals,
         raise-missing-from,
         consider-using-with,
+        no-name-in-module,
 
 
 
