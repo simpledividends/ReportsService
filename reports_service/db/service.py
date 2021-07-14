@@ -4,18 +4,12 @@ from asyncpg import Pool
 from pydantic import BaseModel
 
 from reports_service.log import app_logger
-from reports_service.models.report import Report, ParseStatus
+from reports_service.models.report import ParseStatus, Report
 from reports_service.utils import utc_now
 
 
 class DBService(BaseModel):
     pool: Pool
-    max_active_newcomers_with_same_email: int
-    max_active_requests_change_same_email: int
-    max_active_user_password_tokens: int
-    n_transaction_retries: int
-    transaction_retry_interval_first: float
-    transaction_retry_interval_factor: float
 
     class Config:
         arbitrary_types_allowed = True
@@ -61,4 +55,3 @@ class DBService(BaseModel):
             ParseStatus.in_progress,
         )
         return Report(**record)
-

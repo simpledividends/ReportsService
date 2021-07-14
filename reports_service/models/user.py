@@ -17,4 +17,3 @@ class User(BaseModel):
     created_at: datetime
     verified_at: datetime
     role: UserRole
-

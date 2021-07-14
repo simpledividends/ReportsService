@@ -1,6 +1,6 @@
+import typing as tp
 from datetime import datetime
 from uuid import uuid4
-import typing as tp
 
 from pydantic.main import BaseModel
 
@@ -19,4 +19,3 @@ class AuthService(BaseModel):
             verified_at=datetime(2021, 6, 15),
             role=UserRole.user,
         )
-

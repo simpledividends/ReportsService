@@ -1,16 +1,17 @@
 from http import HTTPStatus
 
-from fastapi import APIRouter, UploadFile, File, Security, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from starlette.requests import Request
-from starlette.responses import JSONResponse
 
 from reports_service.api.auth import get_request_user
 from reports_service.log import app_logger
 from reports_service.models.report import Report
 from reports_service.models.user import User
-from reports_service.response import create_response
-from reports_service.services import get_db_service, get_storage_service, \
-    get_queue_service
+from reports_service.services import (
+    get_db_service,
+    get_queue_service,
+    get_storage_service,
+)
 
 router = APIRouter()
 

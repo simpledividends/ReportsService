@@ -1,7 +1,7 @@
+import typing as tp
 from datetime import datetime
 from enum import Enum
 from uuid import UUID
-import typing as tp
 
 from pydantic.main import BaseModel
 

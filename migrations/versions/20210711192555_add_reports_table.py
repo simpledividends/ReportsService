@@ -6,9 +6,9 @@ Create Date: 2021-07-11 19:25:55.472593
 
 """
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import TIMESTAMP, UUID, SMALLINT, VARCHAR
+from alembic import op
+from sqlalchemy.dialects.postgresql import SMALLINT, TIMESTAMP, UUID, VARCHAR
 
 from reports_service.db.models import broker_enum, parse_status_enum
 

@@ -1,4 +1,5 @@
 import typing as tp
+
 from fastapi import Request, Security
 from fastapi.security import APIKeyHeader
 
