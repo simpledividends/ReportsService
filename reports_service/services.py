@@ -1,8 +1,13 @@
 from asyncpg import create_pool
 from fastapi import FastAPI
 
+from reports_service.auth import AuthService
 from reports_service.db.service import DBService
 from reports_service.settings import ServiceConfig
+
+
+def get_auth_service(app: FastAPI) -> AuthService:
+    return app.state.auth_service
 
 
 def get_db_service(app: FastAPI) -> DBService:
