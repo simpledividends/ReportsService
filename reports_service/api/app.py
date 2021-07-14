@@ -6,6 +6,11 @@ import uvloop
 from fastapi import FastAPI
 
 from ..log import app_logger, setup_logging
+from ..services import (
+    make_auth_service,
+    make_queue_service,
+    make_storage_service,
+)
 from ..settings import ServiceConfig
 from .endpoints import add_routes
 from .events import add_events
@@ -35,6 +40,10 @@ def create_app(config: ServiceConfig) -> FastAPI:
     setup_asyncio(thread_name_prefix=config.service_name)
 
     app = FastAPI()
+
+    app.state.auth_service = make_auth_service(config)
+    app.state.queue_service = make_queue_service(config)
+    app.state.storage_service = make_storage_service(config)
 
     add_routes(app)
     add_middlewares(app, config.request_id_header)
