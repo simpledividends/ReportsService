@@ -3,12 +3,18 @@ on: [push]
 
 env:
   DB_URL: postgresql://user:pass@127.0.0.1:5432/db
+  S3_ENDPOINT_URL: http://localhost:8000
+  S3_ACCESS_KEY_ID: access_key_id
+  S3_SECRET_ACCESS_KEY: secret_access_key
+  S3_REGION: ru-central1
+  S3_BUCKET: bucket
 
 jobs:
   test:
     runs-on: ubuntu-20.04
 
     services:
+
       postgres:
         image: postgres:latest
         env:
@@ -23,6 +29,16 @@ jobs:
           --health-interval 2s
           --health-timeout 1s
           --health-retries 10
+
+      s3:
+        image: zenko/cloudserver:latest-8.2
+        env:
+          SCALITY_ACCESS_KEY_ID: access_key_id
+          SCALITY_SECRET_ACCESS_KEY: secret_access_key
+          REMOTE_MANAGEMENT_DISABLE: 1
+        ports:
+          - 8000:8000
+
 
     steps:
       - uses: actions/checkout@v2
