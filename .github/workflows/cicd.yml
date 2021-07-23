@@ -3,7 +3,7 @@ on: [push]
 
 env:
   DB_URL: postgresql://user:pass@127.0.0.1:5432/db
-  S3_ENDPOINT_URL: http://127.0.0.1:8000
+  S3_ENDPOINT_URL: http://127.0.0.1:8007
   S3_ACCESS_KEY_ID: access_key_id
   S3_SECRET_ACCESS_KEY: secret_access_key
   S3_REGION: ru-central1
@@ -37,7 +37,7 @@ jobs:
           SCALITY_SECRET_ACCESS_KEY: secret_access_key
           REMOTE_MANAGEMENT_DISABLE: 1
         ports:
-          - 8000:8000
+          - 8007:8000
 
 
     steps:
