@@ -38,6 +38,11 @@ jobs:
           REMOTE_MANAGEMENT_DISABLE: 1
         ports:
           - 8007:8000
+        options: >-
+          --health-cmd "curl http://127.0.0.1:8007"
+          --health-interval 2s
+          --health-timeout 1s
+          --health-retries 10
 
 
     steps:
