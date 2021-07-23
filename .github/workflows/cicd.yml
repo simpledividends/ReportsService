@@ -39,7 +39,7 @@ jobs:
         ports:
           - 8007:8000
         options: >-
-          --health-cmd "curl http://127.0.0.1:8007"
+          --health-cmd "if [ "$(curl -s -w "%{http_code}" http://127.0.0.1:8007)" = "000" ]; then echo 2; else echo 0; fi"
           --health-interval 2s
           --health-timeout 1s
           --health-retries 10
