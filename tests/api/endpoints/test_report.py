@@ -3,11 +3,13 @@ from http import HTTPStatus
 from tempfile import NamedTemporaryFile
 
 import orjson
+from botocore.client import BaseClient
 from fastapi.testclient import TestClient
 from sqlalchemy import orm
 
 from reports_service.db.models import ReportsTable
 from reports_service.models.report import ParseStatus
+from reports_service.settings import ServiceConfig
 from reports_service.utils import utc_now
 from tests.helpers import assert_all_tables_are_empty
 from tests.utils import AnyUUID, ApproxDatetime
@@ -18,11 +20,14 @@ UPLOAD_REPORT_PATH = "/reports"
 def test_upload_report_success(
     client: TestClient,
     db_session: orm.Session,
+    s3_client: BaseClient,
+    service_config: ServiceConfig,
 ) -> None:
     now = utc_now()
-    with NamedTemporaryFile("rb+") as f:
+    body = b"some data"
+    with NamedTemporaryFile("w+b") as f:
         filename = os.path.basename(f.name)
-        f.write(b"some data")
+        f.write(body)
         f.seek(0)
         with client:
             resp = client.post(
@@ -53,3 +58,15 @@ def test_upload_report_success(
         orjson.dumps({k: getattr(report, k) for k in resp_json.keys()})
     )
     assert report_dict == resp_json
+
+    # Check report body in storage
+    bucket = service_config.storage_config.bucket
+    objects = s3_client.list_objects(Bucket=bucket)["Contents"]
+    assert len(objects) == 1
+    key = service_config.storage_config.report_body_key_template.format(
+        report_id=resp_json["report_id"]
+    )
+    with NamedTemporaryFile("w+b") as f:
+        s3_client.download_fileobj(bucket, key, f)
+        f.seek(0)
+        assert f.read() == body
