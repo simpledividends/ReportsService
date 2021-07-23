@@ -1,4 +1,4 @@
-from pydantic import BaseSettings, PostgresDsn
+from pydantic import BaseSettings, PostgresDsn, validator
 
 
 class Config(BaseSettings):
@@ -36,16 +36,40 @@ class DBConfig(Config):
     db_pool_config: DBPoolConfig
 
 
+class S3Config(Config):
+    endpoint_url: str
+    access_key_id: str
+    secret_access_key: str
+    region: str
+    bucket: str
+    report_body_key_template: str = "report_bodies/{report_id}"
+
+    class Config:
+        case_sensitive = False
+        env_prefix = "S3_"
+
+    @validator('report_body_key_template')
+    def present_report_id_substitution(  # pylint: disable=no-self-argument
+        cls,
+        key: str,
+    ) -> str:
+        if "{report_id}" not in key:
+            raise ValueError("Must contain substitution for report_id")
+        return key
+
+
 class ServiceConfig(Config):
     service_name: str = "reports_service"
     request_id_header: str = "X-Request-Id"
 
     log_config: LogConfig
     db_config: DBConfig
+    storage_config: S3Config
 
 
 def get_config() -> ServiceConfig:
     return ServiceConfig(
         log_config=LogConfig(),
-        db_config=DBConfig(db_pool_config=DBPoolConfig())
+        db_config=DBConfig(db_pool_config=DBPoolConfig()),
+        storage_config=S3Config(),
     )
