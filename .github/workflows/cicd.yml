@@ -14,21 +14,21 @@ jobs:
     runs-on: ubuntu-20.04
 
     services:
-
-      postgres:
-        image: postgres:latest
-        env:
-          POSTGRES_DB: db
-          POSTGRES_USER: user
-          POSTGRES_PASSWORD: pass
-        ports:
-          - 5432:5432
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 2s
-          --health-timeout 1s
-          --health-retries 10
+#
+#      postgres:
+#        image: postgres:latest
+#        env:
+#          POSTGRES_DB: db
+#          POSTGRES_USER: user
+#          POSTGRES_PASSWORD: pass
+#        ports:
+#          - 5432:5432
+#        # Set health checks to wait until postgres has started
+#        options: >-
+#          --health-cmd pg_isready
+#          --health-interval 2s
+#          --health-timeout 1s
+#          --health-retries 10
 
       s3:
         image: zenko/cloudserver:latest-8.2
