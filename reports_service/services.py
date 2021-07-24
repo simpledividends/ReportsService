@@ -41,5 +41,5 @@ def make_queue_service(_: ServiceConfig) -> QueueService:
     return QueueService()
 
 
-def make_storage_service(_: ServiceConfig) -> StorageService:
-    return StorageService()
+def make_storage_service(config: ServiceConfig) -> StorageService:
+    return StorageService(**config.storage_config.dict())
