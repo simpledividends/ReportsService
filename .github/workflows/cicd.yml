@@ -36,6 +36,7 @@ jobs:
           SCALITY_ACCESS_KEY_ID: access_key_id
           SCALITY_SECRET_ACCESS_KEY: secret_access_key
 #          REMOTE_MANAGEMENT_DISABLE: 1
+          CI: false
         ports:
           - 8007:8000
         options: >-
