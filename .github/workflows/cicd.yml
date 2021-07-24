@@ -35,16 +35,10 @@ jobs:
         env:
           SCALITY_ACCESS_KEY_ID: access_key_id
           SCALITY_SECRET_ACCESS_KEY: secret_access_key
-#          REMOTE_MANAGEMENT_DISABLE: 1
+          REMOTE_MANAGEMENT_DISABLE: 1
           CI: false
         ports:
           - 8007:8000
-        options: >-
-          --health-cmd "if [ '$(curl -s -w '%{http_code}' http://127.0.0.1:8007)' = '000' ]; then echo 2; else echo 0; fi"
-          --health-interval 2s
-          --health-timeout 1s
-          --health-retries 10
-
 
     steps:
 #      - uses: actions/checkout@v2
