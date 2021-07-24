@@ -3,7 +3,7 @@ on: [push]
 
 env:
   DB_URL: postgresql://user:pass@127.0.0.1:5432/db
-  S3_ENDPOINT_URL: http://127.0.0.1:8007
+  S3_ENDPOINT_URL: http://127.0.0.1:4569
   S3_ACCESS_KEY_ID: access_key_id
   S3_SECRET_ACCESS_KEY: secret_access_key
   S3_REGION: ru-central1
@@ -14,42 +14,36 @@ jobs:
     runs-on: ubuntu-20.04
 
     services:
-#
-#      postgres:
-#        image: postgres:latest
-#        env:
-#          POSTGRES_DB: db
-#          POSTGRES_USER: user
-#          POSTGRES_PASSWORD: pass
-#        ports:
-#          - 5432:5432
-#        # Set health checks to wait until postgres has started
-#        options: >-
-#          --health-cmd pg_isready
-#          --health-interval 2s
-#          --health-timeout 1s
-#          --health-retries 10
+
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_DB: db
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: pass
+        ports:
+          - 5432:5432
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 1s
+          --health-retries 10
 
       s3:
-        image: zenko/cloudserver:latest-8.2
-        env:
-          SCALITY_ACCESS_KEY_ID: access_key_id
-          SCALITY_SECRET_ACCESS_KEY: secret_access_key
-          REMOTE_MANAGEMENT_DISABLE: 1
-          CI: false
+        image: lphoward/fake-s3:latest
         ports:
-          - 8007:8000
+          - 4569:4569
 
     steps:
-#      - uses: actions/checkout@v2
-#      - name: "Setup python"
-#        uses: actions/setup-python@v2
-#        with:
-#          python-version: "3.8"
-      - run: curl http://127.0.0.1:8007
+      - uses: actions/checkout@v2
+      - name: "Setup python"
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.8"
+      - run: curl http://127.0.0.1:4569
       - run: pip install poetry
       - run: make install
       - run: make lint
-      - run: curl http://127.0.0.1:8007
       - run: make test
       - run: make cov
