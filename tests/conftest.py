@@ -3,6 +3,7 @@ import os
 import typing as tp
 from contextlib import contextmanager
 from pathlib import Path
+from urllib.parse import urljoin
 
 import boto3
 import pytest
@@ -72,12 +73,12 @@ def db_session(db_bind: sa.engine.Engine) -> tp.Iterator[orm.Session]:
             yield session
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def service_config() -> ServiceConfig:
     return get_config()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def s3_client(service_config: ServiceConfig) -> BaseClient:
     config = service_config.storage_config
     client = boto3.client(
@@ -103,11 +104,43 @@ def s3_bucket(
     clear_bucket(s3_client, bucket)
 
 
+@pytest.fixture(scope="session")
+def sqs_client(service_config: ServiceConfig) -> BaseClient:
+    config = service_config.queue_config
+    client = boto3.client(
+        service_name="sqs",
+        endpoint_url=config.endpoint_url,
+        region_name=config.region,
+        aws_access_key_id=config.access_key_id,
+        aws_secret_access_key=config.secret_access_key,
+    )
+    return client
+
+
+@pytest.fixture(scope="session")
+def sqs_queue_url(service_config: ServiceConfig) -> str:
+    endpoint_url = service_config.queue_config.endpoint_url
+    queue_name = service_config.queue_config.queue
+    queue_url = urljoin(endpoint_url, f"queue/{queue_name}")
+    return queue_url
+
+
+@pytest.fixture
+def sqs_queue(sqs_client: BaseClient, sqs_queue_url: str) -> tp.Iterator[None]:
+    queue_name = sqs_queue_url.split("/")[-1]
+    sqs_client.create_queue(QueueName=queue_name)
+
+    yield
+
+    sqs_client.delete_queue(QueueUrl=sqs_queue_url)
+
+
 @pytest.fixture
 def app(
     service_config: ServiceConfig,
     db_session: orm.Session,
     s3_bucket: None,
+    sqs_queue: None,
 ) -> FastAPI:
     app = create_app(service_config)
     return app
