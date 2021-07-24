@@ -37,8 +37,8 @@ def make_db_service(config: ServiceConfig) -> DBService:
     return service
 
 
-def make_queue_service(_: ServiceConfig) -> QueueService:
-    return QueueService()
+def make_queue_service(config: ServiceConfig) -> QueueService:
+    return QueueService(**config.queue_config.dict())
 
 
 def make_storage_service(config: ServiceConfig) -> StorageService:
