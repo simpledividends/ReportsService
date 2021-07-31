@@ -147,6 +147,7 @@ disable=print-statement,
         raise-missing-from,
         consider-using-with,
         no-name-in-module,
+        duplicate-code,
 
 
 

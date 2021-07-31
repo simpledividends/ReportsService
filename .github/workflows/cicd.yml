@@ -3,12 +3,18 @@ on: [push]
 
 env:
   DB_URL: postgresql://user:pass@127.0.0.1:5432/db
+  S3_ENDPOINT_URL: http://127.0.0.1:9000
+  S3_ACCESS_KEY_ID: access_key_id
+  S3_SECRET_ACCESS_KEY: secret_access_key
+  S3_REGION: ru-central1
+  S3_BUCKET: bucket
 
 jobs:
   test:
     runs-on: ubuntu-20.04
 
     services:
+
       postgres:
         image: postgres:latest
         env:
@@ -23,6 +29,14 @@ jobs:
           --health-interval 2s
           --health-timeout 1s
           --health-retries 10
+
+      s3:
+        image: minio/minio:edge-cicd
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ACCESS_KEY: access_key_id
+          MINIO_SECRET_KEY: secret_access_key
 
     steps:
       - uses: actions/checkout@v2
