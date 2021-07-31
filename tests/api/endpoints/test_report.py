@@ -1,3 +1,4 @@
+import base64
 import os.path
 from http import HTTPStatus
 from tempfile import NamedTemporaryFile
@@ -21,10 +22,13 @@ def test_upload_report_success(
     client: TestClient,
     db_session: orm.Session,
     s3_client: BaseClient,
+    sqs_client: BaseClient,
     service_config: ServiceConfig,
+    sqs_queue_url: str,
 ) -> None:
     now = utc_now()
     body = b"some data"
+    request_id = "some_request_id"
     with NamedTemporaryFile("w+b") as f:
         filename = os.path.basename(f.name)
         f.write(body)
@@ -33,7 +37,10 @@ def test_upload_report_success(
             resp = client.post(
                 UPLOAD_REPORT_PATH,
                 files={"file": f},
-                headers={"Authorization": "Bearer some_token"}
+                headers={
+                    "Authorization": "Bearer some_token",
+                    service_config.request_id_header: request_id,
+                }
             )
 
     # Check response
@@ -70,3 +77,22 @@ def test_upload_report_success(
         s3_client.download_fileobj(bucket, key, f)
         f.seek(0)
         assert f.read() == body
+
+    # Check parse message in queue
+    messages = (
+        sqs_client.receive_message(
+            QueueUrl=sqs_queue_url,
+            MaxNumberOfMessages=10,
+        )
+        .get('Messages', [])
+    )
+    assert len(messages) == 1
+    message = messages[0]
+    msg_content = orjson.loads(base64.b64decode(message["Body"].encode()))
+    headers = msg_content["headers"]
+    assert headers["task"] == service_config.queue_config.parse_task
+    assert headers["id"] == AnyUUID()
+    msg_body = msg_content["body"]
+    msg_body_content = orjson.loads(base64.b64decode(msg_body.encode()))
+    msg_body_kwargs = msg_body_content[1]
+    assert msg_body_kwargs == {"storage_key": key, "request_id": request_id}

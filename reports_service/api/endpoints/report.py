@@ -34,11 +34,11 @@ async def upload_report(
     app_logger.info(f"Report {report.report_id} created in db")
 
     storage_service = get_storage_service(request.app)
-    await storage_service.save_report(report.report_id, file)
+    key = await storage_service.save_report(report.report_id, file)
     app_logger.info(f"Report {report.report_id} saved to storage")
 
     queue_service = get_queue_service(request.app)
-    await queue_service.send_parse_message(report.report_id)
+    await queue_service.send_parse_message(key)
     app_logger.info(f"Parse message for report {report.report_id} sent")
 
     return report

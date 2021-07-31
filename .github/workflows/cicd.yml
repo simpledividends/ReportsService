@@ -7,7 +7,13 @@ env:
   S3_ACCESS_KEY_ID: access_key_id
   S3_SECRET_ACCESS_KEY: secret_access_key
   S3_REGION: ru-central1
-  S3_BUCKET: bucket
+  S3_BUCKET: mybucket
+  SQS_ENDPOINT_URL: http://localhost:9324
+  SQS_ACCESS_KEY_ID: access_key_id
+  SQS_SECRET_ACCESS_KEY: secret_access_key
+  SQS_REGION: ru-central1
+  SQS_QUEUE: myqueue
+  SQS_PARSE_TASK: parse_report
 
 jobs:
   test:
@@ -37,6 +43,11 @@ jobs:
         env:
           MINIO_ACCESS_KEY: access_key_id
           MINIO_SECRET_KEY: secret_access_key
+
+      sqs:
+        image: vsouza/sqs-local:latest
+        ports:
+          - "9324:9324"
 
     steps:
       - uses: actions/checkout@v2

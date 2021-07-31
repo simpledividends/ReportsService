@@ -58,6 +58,19 @@ class S3Config(Config):
         return key
 
 
+class SQSConfig(Config):
+    endpoint_url: str
+    access_key_id: str
+    secret_access_key: str
+    region: str
+    queue: str
+    parse_task: str
+
+    class Config:
+        case_sensitive = False
+        env_prefix = "SQS_"
+
+
 class ServiceConfig(Config):
     service_name: str = "reports_service"
     request_id_header: str = "X-Request-Id"
@@ -65,6 +78,7 @@ class ServiceConfig(Config):
     log_config: LogConfig
     db_config: DBConfig
     storage_config: S3Config
+    queue_config: SQSConfig
 
 
 def get_config() -> ServiceConfig:
@@ -72,4 +86,5 @@ def get_config() -> ServiceConfig:
         log_config=LogConfig(),
         db_config=DBConfig(db_pool_config=DBPoolConfig()),
         storage_config=S3Config(),
+        queue_config=SQSConfig(),
     )

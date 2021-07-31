@@ -24,7 +24,8 @@ class StorageService(BaseModel):
             aws_secret_access_key=self.secret_access_key,
         )
 
-    async def save_report(self, report_id: UUID, file: UploadFile) -> None:
+    async def save_report(self, report_id: UUID, file: UploadFile) -> str:
         key = self.report_body_key_template.format(report_id=report_id)
         async with self._client() as client:
             await client.upload_fileobj(file, self.bucket, key)
+        return key
