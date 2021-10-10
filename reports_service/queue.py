@@ -31,10 +31,14 @@ class QueueService(BaseModel):
             aws_secret_access_key=self.secret_access_key,
         )
 
-    def _make_message(self, storage_key: str) -> str:
+    def _make_message(self, report_id: str, storage_key: str) -> str:
         msg_body_content: MessageBodyContent = (
             [],
-            {"storage_key": storage_key, "request_id": REQUEST_ID.get("-")},
+            {
+                "report_id": report_id,
+                "storage_key": storage_key,
+                "request_id": REQUEST_ID.get("-"),
+            },
             None,
         )
         msg_body = base64.b64encode(orjson.dumps(msg_body_content)).decode()
@@ -61,8 +65,8 @@ class QueueService(BaseModel):
     def queue_url(self) -> str:
         return urljoin(self.endpoint_url, f"queue/{self.queue}")
 
-    async def send_parse_message(self, storage_key: str) -> None:
-        msg = self._make_message(storage_key)
+    async def send_parse_message(self, report_id: uuid.UUID, key: str) -> None:
+        msg = self._make_message(str(report_id), key)
         async with self._client() as client:
             await client.send_message(
                 QueueUrl=self.queue_url,
