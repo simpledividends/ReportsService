@@ -95,4 +95,9 @@ def test_upload_report_success(
     msg_body = msg_content["body"]
     msg_body_content = orjson.loads(base64.b64decode(msg_body.encode()))
     msg_body_kwargs = msg_body_content[1]
-    assert msg_body_kwargs == {"storage_key": key, "request_id": request_id}
+    expected_body_kwargs = {
+        "storage_key": key,
+        "request_id": request_id,
+        "report_id": str(report.report_id),
+        }
+    assert msg_body_kwargs == expected_body_kwargs
