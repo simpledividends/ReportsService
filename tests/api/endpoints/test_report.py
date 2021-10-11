@@ -2,6 +2,7 @@ import base64
 import os.path
 from http import HTTPStatus
 from tempfile import NamedTemporaryFile
+from uuid import uuid4
 
 import orjson
 from botocore.client import BaseClient
@@ -12,10 +13,11 @@ from reports_service.db.models import ReportsTable
 from reports_service.models.report import ParseStatus
 from reports_service.settings import ServiceConfig
 from reports_service.utils import utc_now
-from tests.helpers import assert_all_tables_are_empty
+from tests.helpers import DBObjectCreator, assert_all_tables_are_empty, make_db_report
 from tests.utils import AnyUUID, ApproxDatetime
 
 UPLOAD_REPORT_PATH = "/reports"
+GET_REPORTS_PATH = "/reports"
 
 
 def test_upload_report_success(
@@ -96,3 +98,26 @@ def test_upload_report_success(
     msg_body_content = orjson.loads(base64.b64decode(msg_body.encode()))
     msg_body_kwargs = msg_body_content[1]
     assert msg_body_kwargs == {"storage_key": key, "request_id": request_id}
+
+
+def test_get_reports_success(
+    client: TestClient,
+    db_session: orm.Session,
+    create_db_object: DBObjectCreator,
+) -> None:
+    user_1_id = uuid4()
+    user_2_id = uuid4()
+    create_db_object(make_db_report(user_id=user_1_id, filename="report_1"))
+    create_db_object(make_db_report(user_id=user_2_id, filename="report_2"))
+    create_db_object(make_db_report(user_id=user_1_id, filename="report_3"))
+
+    with client:
+        resp = client.get(
+            GET_REPORTS_PATH,
+            headers={"Authorization": "Bearer some_token"},
+        )
+
+    assert resp.status_code == HTTPStatus.OK
+    reports = resp.json()["reports"]
+    report_names = [r["name"] for r in reports]
+    assert sorted(report_names) == ["report_1", "report_3"]
