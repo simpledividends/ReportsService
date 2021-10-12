@@ -17,11 +17,11 @@ class DBService(BaseModel):
 
     async def setup(self) -> None:
         await self.pool
-        app_logger.info("Auth service initialized")
+        app_logger.info("Db service initialized")
 
     async def cleanup(self) -> None:
         await self.pool.close()
-        app_logger.info("Auth service shutdown")
+        app_logger.info("Db service shutdown")
 
     async def ping(self) -> bool:
         return await self.pool.fetchval("SELECT TRUE")

@@ -8,17 +8,19 @@ from urllib.parse import urljoin
 import boto3
 import pytest
 import sqlalchemy as sa
+from _pytest.monkeypatch import MonkeyPatch
 from alembic import command as alembic_command
 from alembic import config as alembic_config
 from botocore.client import BaseClient
 from fastapi import FastAPI
+from pytest_httpserver import HTTPServer
 from sqlalchemy import orm
 from starlette.testclient import TestClient
 
 from reports_service.api.app import create_app
 from reports_service.db.models import Base
 from reports_service.settings import ServiceConfig, get_config
-from tests.helpers import DBObjectCreator, clear_bucket
+from tests.helpers import DBObjectCreator, FakeAuthServer, clear_bucket
 
 CURRENT_DIR = Path(__file__).parent
 ALEMBIC_INI_PATH = CURRENT_DIR.parent / "alembic.ini"
@@ -74,12 +76,44 @@ def db_session(db_bind: sa.engine.Engine) -> tp.Iterator[orm.Session]:
             yield session
 
 
-@pytest.fixture(scope="session")
-def service_config() -> ServiceConfig:
+@pytest.fixture
+def fake_auth_server() -> FakeAuthServer:
+    return FakeAuthServer()
+
+
+@pytest.fixture
+def get_user_url(
+    httpserver: HTTPServer,
+    fake_auth_server: FakeAuthServer,
+) -> str:
+    path = "/user"
+    url = f"http://127.0.0.1:{httpserver.port}{path}"
+    (
+        httpserver
+        .expect_request(path, "GET")
+        .respond_with_handler(
+            func=fake_auth_server.handle_get_user_request,
+        )
+    )
+    return url
+
+
+@pytest.fixture
+def set_env(get_user_url: str) -> tp.Generator[None, None, None]:
+    monkeypatch = MonkeyPatch()
+    monkeypatch.setenv("GET_USER_URL", get_user_url)
+
+    yield
+
+    monkeypatch.undo()
+
+
+@pytest.fixture
+def service_config(set_env: None) -> ServiceConfig:
     return get_config()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def s3_client(service_config: ServiceConfig) -> BaseClient:
     config = service_config.storage_config
     client = boto3.client(
@@ -98,6 +132,7 @@ def s3_bucket(
     service_config: ServiceConfig,
 ) -> tp.Iterator[None]:
     bucket = service_config.storage_config.bucket
+    clear_bucket(s3_client, bucket)
     s3_client.create_bucket(Bucket=bucket)
 
     yield
@@ -105,7 +140,7 @@ def s3_bucket(
     clear_bucket(s3_client, bucket)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def sqs_client(service_config: ServiceConfig) -> BaseClient:
     config = service_config.queue_config
     client = boto3.client(
@@ -118,7 +153,7 @@ def sqs_client(service_config: ServiceConfig) -> BaseClient:
     return client
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def sqs_queue_url(service_config: ServiceConfig) -> str:
     endpoint_url = service_config.queue_config.endpoint_url
     queue_name = service_config.queue_config.queue

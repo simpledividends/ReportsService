@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic.main import BaseModel
 from starlette.requests import Request
 
+from reports_service.api import responses
 from reports_service.api.auth import get_request_user
 from reports_service.log import app_logger
 from reports_service.models.report import Report
@@ -23,7 +24,9 @@ router = APIRouter()
     tags=["Report"],
     status_code=HTTPStatus.CREATED,
     response_model=Report,
-    responses={},  # TODO
+    responses={
+        403: responses.forbidden,
+    }
 )
 async def upload_report(
     request: Request,
@@ -41,7 +44,7 @@ async def upload_report(
     app_logger.info(f"Report {report.report_id} saved to storage")
 
     queue_service = get_queue_service(request.app)
-    await queue_service.send_parse_message(key)
+    await queue_service.send_parse_message(report.report_id, key)
     app_logger.info(f"Parse message for report {report.report_id} sent")
 
     return report
