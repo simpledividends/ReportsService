@@ -22,7 +22,7 @@ class LogConfig(Config):
 
 class AuthServiceConfig(Config):
     get_user_url: HttpUrl
-    auth_service_request_id_header: str
+    auth_service_request_id_header: str = "X-Request-Id"
     aiohttp_pool_size: int = 100
     aiohttp_session_timeout: float = 5
 
