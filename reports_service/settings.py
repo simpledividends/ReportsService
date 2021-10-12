@@ -1,4 +1,4 @@
-from pydantic import BaseSettings, HttpUrl, PostgresDsn, validator
+from pydantic import BaseSettings, PostgresDsn, validator
 
 
 class Config(BaseSettings):
@@ -21,7 +21,7 @@ class LogConfig(Config):
 
 
 class AuthServiceConfig(Config):
-    get_user_url: HttpUrl
+    get_user_url: str
     auth_service_request_id_header: str = "X-Request-Id"
     aiohttp_pool_size: int = 100
     aiohttp_session_timeout: float = 5
