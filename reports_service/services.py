@@ -24,8 +24,11 @@ def get_storage_service(app: FastAPI) -> StorageService:
     return app.state.storage_service
 
 
-def make_auth_service(_: ServiceConfig) -> AuthService:
-    return AuthService()
+def make_auth_service(config: ServiceConfig) -> AuthService:
+    config_dict = config.auth_service_config.dict()
+    request_id_header = config_dict.pop("auth_service_request_id_header")
+    config_dict["request_id_header"] = request_id_header
+    return AuthService(**config_dict)
 
 
 def make_db_service(config: ServiceConfig) -> DBService:
