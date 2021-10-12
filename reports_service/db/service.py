@@ -65,6 +65,6 @@ class DBService(BaseModel):
         """
         records = await self.pool.fetch(
             query,
-            uuid4(),
+            user_id,
         )
         return [Report(**record) for record in records]

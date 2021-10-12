@@ -1,4 +1,3 @@
-from datetime import datetime
 import typing as tp
 from datetime import datetime
 from http import HTTPStatus
@@ -7,6 +6,7 @@ from uuid import UUID, uuid4
 import orjson
 import werkzeug
 from botocore.client import BaseClient
+from requests import Response
 from sqlalchemy import inspect, orm, text
 
 from reports_service.auth import AUTH_SERVISE_AUTHORIZATION_HEADER
@@ -28,8 +28,8 @@ class FakeAuthServer:
         self,
         request: werkzeug.Request,
     ) -> werkzeug.Response:
-        auth_header = request.headers.get(AUTH_SERVISE_AUTHORIZATION_HEADER)
-        splitted = auth_header.split()
+        header = request.headers.get(AUTH_SERVISE_AUTHORIZATION_HEADER, "")
+        splitted = header.split()
         if (
             len(splitted) == 2
             and splitted[0] == "Bearer"
@@ -60,6 +60,11 @@ class FakeAuthServer:
                 status=status_code,
                 content_type="application/json"
             )
+
+
+def assert_forbidden(response: Response) -> None:
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json()["errors"][0]["error_key"] == "forbidden!"
 
 
 def assert_all_tables_are_empty(

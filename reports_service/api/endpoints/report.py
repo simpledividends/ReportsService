@@ -1,5 +1,5 @@
-from http import HTTPStatus
 import typing as tp
+from http import HTTPStatus
 
 from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic.main import BaseModel
@@ -59,12 +59,14 @@ class Reports(BaseModel):
     tags=["Report"],
     status_code=HTTPStatus.OK,
     response_model=Reports,
-    responses={},  # TODO
+    responses={
+        403: responses.forbidden,
+    },
 )
 async def get_reports(
     request: Request,
     user: User = Depends(get_request_user)
-) -> Report:
+) -> Reports:
     app_logger.info(f"User {user.user_id} requested reports")
     db_service = get_db_service(request.app)
     reports = await db_service.get_reports(user.user_id)
