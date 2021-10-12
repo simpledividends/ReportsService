@@ -3,7 +3,7 @@ from http import HTTPStatus
 from socket import AF_INET
 
 import aiohttp
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 from reports_service.api.exceptions import ForbiddenException
 from reports_service.context import REQUEST_ID
@@ -18,7 +18,7 @@ class AuthServiceError(Exception):
 
 
 class AuthService(BaseModel):
-    get_user_url: HttpUrl
+    get_user_url: str
     request_id_header: str
     aiohttp_pool_size: int
     aiohttp_session_timeout: float
