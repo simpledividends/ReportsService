@@ -3,6 +3,7 @@ from http import HTTPStatus
 from fastapi import APIRouter, Depends, File, UploadFile
 from starlette.requests import Request
 
+from reports_service.api import responses
 from reports_service.api.auth import get_request_user
 from reports_service.log import app_logger
 from reports_service.models.report import Report
@@ -21,6 +22,9 @@ router = APIRouter()
     tags=["Report"],
     status_code=HTTPStatus.CREATED,
     response_model=Report,
+    responses={
+        403: responses.forbidden,
+    }
 )
 async def upload_report(
     request: Request,

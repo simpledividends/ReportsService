@@ -2,6 +2,7 @@ import base64
 import os.path
 from http import HTTPStatus
 from tempfile import NamedTemporaryFile
+from uuid import uuid4
 
 import orjson
 from botocore.client import BaseClient
@@ -12,7 +13,7 @@ from reports_service.db.models import ReportsTable
 from reports_service.models.report import ParseStatus
 from reports_service.settings import ServiceConfig
 from reports_service.utils import utc_now
-from tests.helpers import assert_all_tables_are_empty
+from tests.helpers import FakeAuthServer, assert_all_tables_are_empty
 from tests.utils import AnyUUID, ApproxDatetime
 
 UPLOAD_REPORT_PATH = "/reports"
@@ -20,12 +21,17 @@ UPLOAD_REPORT_PATH = "/reports"
 
 def test_upload_report_success(
     client: TestClient,
+    fake_auth_server: FakeAuthServer,
     db_session: orm.Session,
     s3_client: BaseClient,
     sqs_client: BaseClient,
     service_config: ServiceConfig,
     sqs_queue_url: str,
 ) -> None:
+    access_token = "some_token"
+    user_id = uuid4()
+    fake_auth_server.set_ok_responses({access_token: user_id})
+
     now = utc_now()
     body = b"some data"
     request_id = "some_request_id"
@@ -38,7 +44,7 @@ def test_upload_report_success(
                 UPLOAD_REPORT_PATH,
                 files={"file": f},
                 headers={
-                    "Authorization": "Bearer some_token",
+                    "Authorization": f"Bearer {access_token}",
                     service_config.request_id_header: request_id,
                 }
             )
@@ -48,7 +54,7 @@ def test_upload_report_success(
     resp_json = resp.json()
     assert resp_json == {
         "report_id": AnyUUID(),
-        "user_id": AnyUUID(),
+        "user_id": str(user_id),
         "filename": filename,
         "created_at": ApproxDatetime(now),
         "parse_status": ParseStatus.in_progress,
@@ -101,3 +107,20 @@ def test_upload_report_success(
         "report_id": str(report.report_id),
         }
     assert msg_body_kwargs == expected_body_kwargs
+
+
+def test_upload_report_forbidden(
+    client: TestClient,
+) -> None:
+    with NamedTemporaryFile("w+b") as f:
+        f.write(b"some data")
+        f.seek(0)
+        with client:
+            resp = client.post(
+                UPLOAD_REPORT_PATH,
+                files={"file": f},
+                headers={"Authorization": "Bearer some_token"}
+            )
+
+    assert resp.status_code == HTTPStatus.FORBIDDEN
+    assert resp.json()["errors"][0]["error_key"] == "forbidden!"
