@@ -22,6 +22,7 @@ from reports_service.db.models import Base
 from reports_service.settings import ServiceConfig, get_config
 from tests.helpers import DBObjectCreator, FakeAuthServer, clear_bucket
 
+
 CURRENT_DIR = Path(__file__).parent
 ALEMBIC_INI_PATH = CURRENT_DIR.parent / "alembic.ini"
 
