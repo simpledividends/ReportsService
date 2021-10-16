@@ -1,15 +1,19 @@
 import typing as tp
 from datetime import datetime
 from http import HTTPStatus
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import orjson
 import werkzeug
 from botocore.client import BaseClient
+from requests import Response
 from sqlalchemy import inspect, orm, text
 
 from reports_service.auth import AUTH_SERVISE_AUTHORIZATION_HEADER
-from reports_service.db.models import Base
+from reports_service.db.models import Base, ReportsTable
+from reports_service.models.report import Broker, ParseStatus
+
+DBObjectCreator = tp.Callable[[Base], None]
 
 
 class FakeAuthServer:
@@ -24,8 +28,8 @@ class FakeAuthServer:
         self,
         request: werkzeug.Request,
     ) -> werkzeug.Response:
-        auth_header = request.headers.get(AUTH_SERVISE_AUTHORIZATION_HEADER)
-        splitted = auth_header.split()
+        header = request.headers.get(AUTH_SERVISE_AUTHORIZATION_HEADER, "")
+        splitted = header.split()
         if (
             len(splitted) == 2
             and splitted[0] == "Bearer"
@@ -58,6 +62,11 @@ class FakeAuthServer:
             )
 
 
+def assert_forbidden(response: Response) -> None:
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json()["errors"][0]["error_key"] == "forbidden!"
+
+
 def assert_all_tables_are_empty(
     db_session: orm.Session,
     exclude: tp.Collection[Base] = (),
@@ -79,3 +88,23 @@ def clear_bucket(s3_client: BaseClient, bucket: str) -> None:
         for obj in objects:
             s3_client.delete_object(Bucket=bucket, Key=obj["Key"])
         s3_client.delete_bucket(Bucket=bucket)
+
+
+def make_db_report(
+    report_id: tp.Optional[UUID] = None,
+    user_id: tp.Optional[UUID] = None,
+    filename: str = "some_filename",
+    created_at: datetime = datetime(2021, 10, 11),
+    parse_status: ParseStatus = ParseStatus.in_progress,
+    broker: tp.Optional[Broker] = None,
+    year: tp.Optional[int] = None,
+) -> ReportsTable:
+    return ReportsTable(
+        report_id=str(report_id or uuid4()),
+        user_id=str(user_id or uuid4()),
+        filename=filename,
+        created_at=created_at,
+        parse_status=parse_status,
+        broker=broker,
+        year=year,
+    )

@@ -18,8 +18,9 @@ from sqlalchemy import orm
 from starlette.testclient import TestClient
 
 from reports_service.api.app import create_app
+from reports_service.db.models import Base
 from reports_service.settings import ServiceConfig, get_config
-from tests.helpers import FakeAuthServer, clear_bucket
+from tests.helpers import DBObjectCreator, FakeAuthServer, clear_bucket
 
 CURRENT_DIR = Path(__file__).parent
 ALEMBIC_INI_PATH = CURRENT_DIR.parent / "alembic.ini"
@@ -184,3 +185,16 @@ def app(
 @pytest.fixture
 def client(app: FastAPI) -> TestClient:
     return TestClient(app=app)
+
+
+@pytest.fixture
+def create_db_object(
+    db_session: orm.Session,
+) -> DBObjectCreator:
+    assert db_session.is_active
+
+    def create(obj: Base) -> None:
+        db_session.add(obj)
+        db_session.commit()
+
+    return create

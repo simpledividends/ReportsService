@@ -1,10 +1,12 @@
 import base64
 import os.path
+import typing as tp
 from http import HTTPStatus
 from tempfile import NamedTemporaryFile
 from uuid import uuid4
 
 import orjson
+import pytest
 from botocore.client import BaseClient
 from fastapi.testclient import TestClient
 from sqlalchemy import orm
@@ -13,10 +15,17 @@ from reports_service.db.models import ReportsTable
 from reports_service.models.report import ParseStatus
 from reports_service.settings import ServiceConfig
 from reports_service.utils import utc_now
-from tests.helpers import FakeAuthServer, assert_all_tables_are_empty
+from tests.helpers import (
+    DBObjectCreator,
+    FakeAuthServer,
+    assert_all_tables_are_empty,
+    assert_forbidden,
+    make_db_report,
+)
 from tests.utils import AnyUUID, ApproxDatetime
 
 UPLOAD_REPORT_PATH = "/reports"
+GET_REPORTS_PATH = "/reports"
 
 
 def test_upload_report_success(
@@ -109,8 +118,10 @@ def test_upload_report_success(
     assert msg_body_kwargs == expected_body_kwargs
 
 
+@pytest.mark.parametrize("headers", ({}, {"Authorization": "Bearer token"}))
 def test_upload_report_forbidden(
     client: TestClient,
+    headers: tp.Dict[str, str],
 ) -> None:
     with NamedTemporaryFile("w+b") as f:
         f.write(b"some data")
@@ -119,8 +130,47 @@ def test_upload_report_forbidden(
             resp = client.post(
                 UPLOAD_REPORT_PATH,
                 files={"file": f},
-                headers={"Authorization": "Bearer some_token"}
+                headers=headers,
             )
+    assert_forbidden(resp)
 
-    assert resp.status_code == HTTPStatus.FORBIDDEN
-    assert resp.json()["errors"][0]["error_key"] == "forbidden!"
+
+def test_get_reports_success(
+    client: TestClient,
+    create_db_object: DBObjectCreator,
+    fake_auth_server: FakeAuthServer,
+) -> None:
+    user_1_id = uuid4()
+    user_2_id = uuid4()
+    create_db_object(make_db_report(user_id=user_1_id, filename="report_1"))
+    create_db_object(make_db_report(user_id=user_2_id, filename="report_2"))
+    create_db_object(make_db_report(user_id=user_1_id, filename="report_3"))
+
+    access_token = "some_token"
+    fake_auth_server.set_ok_responses({access_token: user_1_id})
+
+    with client:
+        resp = client.get(
+            GET_REPORTS_PATH,
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    assert resp.status_code == HTTPStatus.OK
+    reports = resp.json()["reports"]
+    report_names = [r["filename"] for r in reports]
+    assert sorted(report_names) == ["report_1", "report_3"]
+
+
+@pytest.mark.parametrize("headers", ({}, {"Authorization": "Bearer token"}))
+def test_get_reports_forbidden(
+    client: TestClient,
+    create_db_object: DBObjectCreator,
+    headers: tp.Dict[str, str],
+) -> None:
+    create_db_object(make_db_report())
+    with client:
+        resp = client.get(
+            GET_REPORTS_PATH,
+            headers=headers,
+        )
+    assert_forbidden(resp)

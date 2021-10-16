@@ -1,3 +1,4 @@
+import typing as tp
 from uuid import UUID, uuid4
 
 from asyncpg import Pool
@@ -55,3 +56,15 @@ class DBService(BaseModel):
             ParseStatus.in_progress,
         )
         return Report(**record)
+
+    async def get_reports(self, user_id: UUID) -> tp.List[Report]:
+        query = """
+            SELECT *
+            FROM reports
+            WHERE user_id = $1::UUID
+        """
+        records = await self.pool.fetch(
+            query,
+            user_id,
+        )
+        return [Report(**record) for record in records]
