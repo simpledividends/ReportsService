@@ -67,52 +67,6 @@ def assert_forbidden(response: Response) -> None:
     assert response.json()["errors"][0]["error_key"] == "forbidden!"
 
 
-class FakeAuthServer:
-
-    def __init__(self) -> None:
-        self.ok_responses: tp.Dict[str, UUID] = {}
-
-    def set_ok_responses(self, ok_responses: tp.Dict[str, UUID]) -> None:
-        self.ok_responses = ok_responses
-
-    def handle_get_user_request(
-        self,
-        request: werkzeug.Request,
-    ) -> werkzeug.Response:
-        auth_header = request.headers.get(AUTH_SERVISE_AUTHORIZATION_HEADER)
-        splitted = auth_header.split()
-        if (
-            len(splitted) == 2
-            and splitted[0] == "Bearer"
-            and splitted[1] in self.ok_responses
-        ):
-            token = splitted[1]
-            body = {
-                "user_id": self.ok_responses[token],
-                "email": "user@ma.il",
-                "name": "user name",
-                "created_at": datetime(2021, 10, 11),
-                "verified_at": datetime(2021, 6, 11),
-                "role": "user",
-            }
-            status_code = HTTPStatus.OK
-        else:
-            body = {
-                "errors": [
-                    {
-                        "error_key": "forbidden!",
-                        "error_message": "Forbidden",
-                    }
-                ]
-            }
-            status_code = HTTPStatus.FORBIDDEN
-        return werkzeug.Response(
-                orjson.dumps(body),
-                status=status_code,
-                content_type="application/json"
-            )
-
-
 def assert_all_tables_are_empty(
     db_session: orm.Session,
     exclude: tp.Collection[Base] = (),
