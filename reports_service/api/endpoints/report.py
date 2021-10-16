@@ -1,14 +1,12 @@
-import typing as tp
 from http import HTTPStatus
 
 from fastapi import APIRouter, Depends, File, UploadFile
-from pydantic.main import BaseModel
 from starlette.requests import Request
 
 from reports_service.api import responses
 from reports_service.api.auth import get_request_user
 from reports_service.log import app_logger
-from reports_service.models.report import Report
+from reports_service.models.report import Report, Reports
 from reports_service.models.user import User
 from reports_service.services import (
     get_db_service,
@@ -26,6 +24,7 @@ router = APIRouter()
     response_model=Report,
     responses={
         403: responses.forbidden,
+        422: responses.unprocessable_entity,
     }
 )
 async def upload_report(
@@ -48,10 +47,6 @@ async def upload_report(
     app_logger.info(f"Parse message for report {report.report_id} sent")
 
     return report
-
-
-class Reports(BaseModel):
-    reports: tp.List[Report]
 
 
 @router.get(

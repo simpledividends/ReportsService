@@ -5,7 +5,12 @@ from asyncpg import Pool
 from pydantic import BaseModel
 
 from reports_service.log import app_logger
-from reports_service.models.report import ParseStatus, Report
+from reports_service.models.report import (
+    ExtendedParsedReportInfo,
+    ParseStatus,
+    ParsedReportRow,
+    Report,
+)
 from reports_service.utils import utc_now
 
 
@@ -63,8 +68,107 @@ class DBService(BaseModel):
             FROM reports
             WHERE user_id = $1::UUID
         """
-        records = await self.pool.fetch(
-            query,
-            user_id,
-        )
+        records = await self.pool.fetch(query, user_id)
         return [Report(**record) for record in records]
+
+    async def delete_report_rows(self, report_id: UUID) -> None:
+        query = """
+            DELETE FROM TABLE report_rows
+            WHERE report_id = $1::UUID
+        """
+        await self.pool.execute(query, report_id)
+
+    async def add_report_rows(
+        self,
+        report_id: UUID,
+        rows: tp.List[ParsedReportRow],
+    ) -> None:
+        query = """
+            INSERT INTO reports
+                (
+                    report_id
+                    , row_n
+                    , isin
+                    , name_full
+                    , name
+                    , tax_rate
+                    , country_code
+                    , income_amount
+                    , income_date
+                    , income_currency_rate
+                    , tax_payment_date
+                    , payed_tax_amount
+                    , tax_payment_currency_rate
+                )
+            VALUES
+                (
+                    $1::UUID
+                    , $2::INTEGER
+                    , $3::VARCHAR
+                    , $4::VARCHAR
+                    , $5::VARCHAR
+                    , $6::VARCHAR
+                    , $7::VARCHAR
+                    , $8::FLOAT
+                    , $9::DATE
+                    , $10::FLOAT
+                    , $11::DATE
+                    , $12::FLOAT
+                    , $13::FLOAT
+                )
+        """
+        values = (
+            (
+                report_id,
+                row_n,
+                row.isin,
+                row.name_full,
+                row.name,
+                row.tax_rate,
+                row.country_code,
+                row.income_amount,
+                row.income_date,
+                row.income_currency_rate,
+                row.tax_payment_date,
+                row.payed_tax_amount,
+                row.tax_payment_currency_rate,
+            )
+            for row_n, row in enumerate(rows, 1)
+        )
+        await self.pool.executemany(query, values)
+
+    async def update_parsed_report(
+        self,
+        report_id: UUID,
+        parse_status: ParseStatus,
+        report_info: tp.Optional[ExtendedParsedReportInfo],
+    ) -> None:
+        query = """
+            UPDATE reports
+            SET
+                parse_status = $2::parse_status_enum
+                parsed_at = $3::TIMESTAMP
+                broker = $4::broker_enum
+                period = $5::DATERANGE
+                year = $6::SMALLINT
+                parse_note = $7::VARCHAR
+                parser_version = $8::VARCHAR
+            WHERE report_id = $1::UUID
+        """
+        if report_info is not None:
+            info_values = (
+                report_info.broker,
+                report_info.period,
+                report_info.year,
+                report_info.note,
+                report_info.version,
+            )
+        else:
+            info_values = (None, None, None, None, None)
+        await self.pool.execute(
+            query,
+            report_id,
+            parse_status,
+            utc_now(),
+            *info_values,
+        )
