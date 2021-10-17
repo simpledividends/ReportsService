@@ -39,7 +39,7 @@ def test_upload_report_success(
 ) -> None:
     access_token = "some_token"
     user_id = uuid4()
-    fake_auth_server.set_ok_responses({access_token: user_id})
+    fake_auth_server.add_ok_response(access_token, user_id)
 
     now = utc_now()
     body = b"some data"
@@ -67,8 +67,12 @@ def test_upload_report_success(
         "filename": filename,
         "created_at": ApproxDatetime(now),
         "parse_status": ParseStatus.in_progress,
+        "parsed_at": None,
         "broker": None,
+        "period": None,
         "year": None,
+        "parse_note": None,
+        "parser_version": None,
     }
 
     # Check DB content
@@ -77,9 +81,14 @@ def test_upload_report_success(
     assert len(reports) == 1
     report = reports[0]
     report_dict = orjson.loads(
-        orjson.dumps({k: getattr(report, k) for k in resp_json.keys()})
+        orjson.dumps(
+            {k: getattr(report, k) for k in resp_json.keys() if k != "period"}
+        )
     )
+    resp_json.pop("period")
     assert report_dict == resp_json
+    assert report.period_start is None
+    assert report.period_end is None
 
     # Check report body in storage
     bucket = service_config.storage_config.bucket
@@ -147,7 +156,7 @@ def test_get_reports_success(
     create_db_object(make_db_report(user_id=user_1_id, filename="report_3"))
 
     access_token = "some_token"
-    fake_auth_server.set_ok_responses({access_token: user_1_id})
+    fake_auth_server.add_ok_response(access_token, user_1_id)
 
     with client:
         resp = client.get(
@@ -159,6 +168,28 @@ def test_get_reports_success(
     reports = resp.json()["reports"]
     report_names = [r["filename"] for r in reports]
     assert sorted(report_names) == ["report_1", "report_3"]
+
+
+def test_get_reports_when_no_user_reports(
+    client: TestClient,
+    create_db_object: DBObjectCreator,
+    fake_auth_server: FakeAuthServer,
+) -> None:
+    user_1_id = uuid4()
+    user_2_id = uuid4()
+    create_db_object(make_db_report(user_id=user_2_id, filename="report_2"))
+
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_1_id)
+
+    with client:
+        resp = client.get(
+            GET_REPORTS_PATH,
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    assert resp.status_code == HTTPStatus.OK
+    assert len(resp.json()["reports"]) == 0
 
 
 @pytest.mark.parametrize("headers", ({}, {"Authorization": "Bearer token"}))

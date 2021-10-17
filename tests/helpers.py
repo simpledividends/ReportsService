@@ -1,5 +1,5 @@
 import typing as tp
-from datetime import datetime
+from datetime import date, datetime
 from http import HTTPStatus
 from uuid import UUID, uuid4
 
@@ -10,8 +10,9 @@ from requests import Response
 from sqlalchemy import inspect, orm, text
 
 from reports_service.auth import AUTH_SERVISE_AUTHORIZATION_HEADER
-from reports_service.db.models import Base, ReportsTable
-from reports_service.models.report import Broker, ParseStatus
+from reports_service.db.models import Base, ReportRowsTable, ReportsTable
+from reports_service.models.report import ParseStatus, ParsedReportRow
+from reports_service.models.user import UserRole
 
 DBObjectCreator = tp.Callable[[Base], None]
 
@@ -19,10 +20,15 @@ DBObjectCreator = tp.Callable[[Base], None]
 class FakeAuthServer:
 
     def __init__(self) -> None:
-        self.ok_responses: tp.Dict[str, UUID] = {}
+        self.ok_responses: tp.Dict[str, tp.Tuple[UUID, UserRole]] = {}
 
-    def set_ok_responses(self, ok_responses: tp.Dict[str, UUID]) -> None:
-        self.ok_responses = ok_responses
+    def add_ok_response(
+        self,
+        token: str,
+        user_id: UUID,
+        role: UserRole = UserRole.user,
+    ) -> None:
+        self.ok_responses[token] = (user_id, role)  # token -> (user_id, role)
 
     def handle_get_user_request(
         self,
@@ -35,14 +41,14 @@ class FakeAuthServer:
             and splitted[0] == "Bearer"
             and splitted[1] in self.ok_responses
         ):
-            token = splitted[1]
+            user_id, role = self.ok_responses[splitted[1]]
             body = {
-                "user_id": self.ok_responses[token],
+                "user_id": user_id,
                 "email": "user@ma.il",
                 "name": "user name",
                 "created_at": datetime(2021, 10, 11),
                 "verified_at": datetime(2021, 6, 11),
-                "role": "user",
+                "role": role,
             }
             status_code = HTTPStatus.OK
         else:
@@ -96,7 +102,7 @@ def make_db_report(
     filename: str = "some_filename",
     created_at: datetime = datetime(2021, 10, 11),
     parse_status: ParseStatus = ParseStatus.in_progress,
-    broker: tp.Optional[Broker] = None,
+    broker: tp.Optional[str] = None,
     year: tp.Optional[int] = None,
 ) -> ReportsTable:
     return ReportsTable(
@@ -107,4 +113,45 @@ def make_db_report(
         parse_status=parse_status,
         broker=broker,
         year=year,
+    )
+
+
+def make_db_report_row(
+    report_id: tp.Optional[UUID] = None,
+    row_n: int = 1,
+    isin: str = "isin"
+) -> ReportRowsTable:
+    return ReportRowsTable(
+        report_id=str(report_id or uuid4()),
+        row_n=row_n,
+        isin=isin,
+        name_full="full name",
+        name="name",
+        tax_rate="13",
+        country_code="840",
+        income_amount=15.3,
+        income_date=date(2020, 10, 16),
+        income_currency_rate=77.7,
+        tax_payment_date=date(2020, 10, 16),
+        payed_tax_amount=2.3,
+        tax_payment_currency_rate=77.7,
+    )
+
+
+def make_report_row(
+    isin: str = "isin",
+    payed_tax_amount: tp.Optional[float] = 2.3,
+) -> ParsedReportRow:
+    return ParsedReportRow(
+        isin=isin,
+        name_full="full name",
+        name="name",
+        tax_rate="13",
+        country_code="840",
+        income_amount=15.3,
+        income_date=date(2020, 10, 16),
+        income_currency_rate=77.7,
+        tax_payment_date=date(2020, 10, 16),
+        payed_tax_amount=payed_tax_amount,
+        tax_payment_currency_rate=77.7,
     )
