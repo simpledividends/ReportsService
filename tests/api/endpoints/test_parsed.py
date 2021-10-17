@@ -117,9 +117,12 @@ def test_upload_parsed_report_success(
 
     # Check rows
     rows = db_session.query(ReportRowsTable).all()
+    expected_rows = body["parsed_report"]["rows"]
     isins = [row.isin for row in rows]
-    expected_isins = [row["isin"] for row in body["parsed_report"]["rows"]]
+    expected_isins = [row["isin"] for row in expected_rows]
     assert sorted(isins) == sorted(expected_isins)
+    row_numbers = [row.row_n for row in rows]
+    assert row_numbers == list(range(1, len(expected_rows) + 1))
 
 
 @pytest.mark.parametrize("prev_parsed_exists", (True, False))
