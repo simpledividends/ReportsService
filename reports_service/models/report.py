@@ -24,7 +24,6 @@ class BaseReportInfo(BaseModel):
 
 class ParsedReportRow(BaseModel):
     isin: str
-    name_full: str
     name: str
     tax_rate: str
     country_code: str

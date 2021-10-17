@@ -125,7 +125,6 @@ def make_db_report_row(
         report_id=str(report_id or uuid4()),
         row_n=row_n,
         isin=isin,
-        name_full="full name",
         name="name",
         tax_rate="13",
         country_code="840",
@@ -144,7 +143,6 @@ def make_report_row(
 ) -> ParsedReportRow:
     return ParsedReportRow(
         isin=isin,
-        name_full="full name",
         name="name",
         tax_rate="13",
         country_code="840",

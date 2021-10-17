@@ -40,7 +40,6 @@ class ReportRowsTable(Base):
     )
     row_n = Column(pg.INTEGER, primary_key=True)
     isin = Column(pg.VARCHAR(32), nullable=False)
-    name_full = Column(pg.VARCHAR(256), nullable=False)
     name = Column(pg.VARCHAR(256), nullable=False)
     tax_rate = Column(pg.VARCHAR(8), nullable=False)
     country_code = Column(pg.VARCHAR(8), nullable=False)

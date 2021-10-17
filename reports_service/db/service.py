@@ -115,7 +115,6 @@ class DBService(BaseModel):
                     report_id
                     , row_n
                     , isin
-                    , name_full
                     , name
                     , tax_rate
                     , country_code
@@ -134,13 +133,12 @@ class DBService(BaseModel):
                     , $4::VARCHAR
                     , $5::VARCHAR
                     , $6::VARCHAR
-                    , $7::VARCHAR
-                    , $8::FLOAT
-                    , $9::DATE
-                    , $10::FLOAT
-                    , $11::DATE
+                    , $7::FLOAT
+                    , $8::DATE
+                    , $9::FLOAT
+                    , $10::DATE
+                    , $11::FLOAT
                     , $12::FLOAT
-                    , $13::FLOAT
                 )
         """
         values = (
@@ -148,7 +146,6 @@ class DBService(BaseModel):
                 report_id,
                 row_n,
                 row.isin,
-                row.name_full,
                 row.name,
                 row.tax_rate,
                 row.country_code,

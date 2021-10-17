@@ -22,7 +22,6 @@ def upgrade():
         sa.Column("report_id", UUID, primary_key=True),
         sa.Column("row_n", INTEGER, primary_key=True),
         sa.Column("isin", VARCHAR(32), nullable=False),
-        sa.Column("name_full", VARCHAR(256), nullable=False),
         sa.Column("name", VARCHAR(256), nullable=False),
         sa.Column("tax_rate", VARCHAR(8), nullable=False),
         sa.Column("country_code", VARCHAR(8), nullable=False),
