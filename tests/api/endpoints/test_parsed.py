@@ -398,7 +398,6 @@ def test_get_report_rows_when_not_parsed(
 
 def test_get_report_rows_when_not_exist(
     client: TestClient,
-    create_db_object: DBObjectCreator,
     fake_auth_server: FakeAuthServer,
 ) -> None:
     user_id = uuid4()

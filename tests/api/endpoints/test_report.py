@@ -26,6 +26,7 @@ from tests.utils import AnyUUID, ApproxDatetime
 
 UPLOAD_REPORT_PATH = "/reports"
 GET_REPORTS_PATH = "/reports"
+GET_REPORT_PATH = "/reports/{report_id}"
 
 
 def test_upload_report_success(
@@ -205,3 +206,83 @@ def test_get_reports_forbidden(
             headers=headers,
         )
     assert_forbidden(resp)
+
+
+def test_get_report_success(
+    client: TestClient,
+    create_db_object: DBObjectCreator,
+    fake_auth_server: FakeAuthServer,
+) -> None:
+    user_1_id = uuid4()
+    user_2_id = uuid4()
+    report = make_db_report(user_id=user_1_id, filename="report_1")
+    create_db_object(report)
+    create_db_object(make_db_report(user_id=user_2_id, filename="report_2"))
+    create_db_object(make_db_report(user_id=user_1_id, filename="report_3"))
+
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_1_id)
+
+    with client:
+        resp = client.get(
+            GET_REPORT_PATH.format(report_id=report.report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    assert resp.status_code == HTTPStatus.OK
+    resp_dict = resp.json()
+    assert resp_dict["filename"] == "report_1"
+    assert resp_dict["report_id"] == report.report_id
+    assert resp_dict["user_id"] == str(user_1_id)
+
+
+@pytest.mark.parametrize("headers", ({}, {"Authorization": "Bearer token"}))
+def test_get_report_forbidden_when_not_authenticated(
+    client: TestClient,
+    headers: tp.Dict[str, str],
+) -> None:
+    with client:
+        resp = client.get(
+            GET_REPORTS_PATH.format(report_id=uuid4()),
+            headers=headers,
+        )
+    assert_forbidden(resp)
+
+
+def test_get_report_forbidden_when_foreign_report(
+    client: TestClient,
+    create_db_object: DBObjectCreator,
+    fake_auth_server: FakeAuthServer,
+) -> None:
+    user_id = uuid4()
+    foreign_report_id = uuid4()
+    foreign_report = make_db_report(
+        foreign_report_id,
+        user_id=uuid4(),
+        parse_status=ParseStatus.parsed,
+    )
+    create_db_object(foreign_report)
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+    with client:
+        resp = client.get(
+            GET_REPORT_PATH.format(report_id=foreign_report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    assert_forbidden(resp, "forbidden")
+
+
+def test_get_report_when_not_exist(
+    client: TestClient,
+    fake_auth_server: FakeAuthServer,
+) -> None:
+    user_id = uuid4()
+    report_id = uuid4()
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+    with client:
+        resp = client.get(
+            GET_REPORT_PATH.format(report_id=report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    assert resp.status_code == HTTPStatus.NOT_FOUND

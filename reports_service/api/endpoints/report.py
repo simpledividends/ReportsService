@@ -1,10 +1,15 @@
 from http import HTTPStatus
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, UploadFile
 from starlette.requests import Request
 
 from reports_service.api import responses
 from reports_service.api.auth import get_request_user
+from reports_service.api.exceptions import (
+    ForbiddenException,
+    NotFoundException,
+)
 from reports_service.log import app_logger
 from reports_service.models.report import Report, Reports
 from reports_service.models.user import User
@@ -66,3 +71,31 @@ async def get_reports(
     db_service = get_db_service(request.app)
     reports = await db_service.get_reports(user.user_id)
     return Reports(reports=reports)
+
+
+@router.get(
+    path="/reports/{report_id}",
+    tags=["Report"],
+    status_code=HTTPStatus.OK,
+    response_model=Report,
+    responses={
+        403: responses.forbidden,
+        404: responses.not_found,
+    },
+)
+async def get_report(
+    request: Request,
+    report_id: UUID,
+    user: User = Depends(get_request_user)
+) -> Report:
+    app_logger.info(f"User {user.user_id} requested report {report_id}")
+
+    db_service = get_db_service(request.app)
+
+    report = await db_service.get_report(report_id)
+    if report is None:
+        raise NotFoundException()
+    if report.user_id != user.user_id:
+        raise ForbiddenException()
+
+    return report
