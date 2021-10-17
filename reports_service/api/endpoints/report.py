@@ -113,8 +113,8 @@ async def get_report(
 async def delete_report(
     request: Request,
     report_id: UUID,
-    user: User = Depends(get_request_user)
-) -> Report:
+    user: User = Depends(get_request_user),
+) -> None:
     app_logger.info(f"User {user.user_id} want to delete report {report_id}")
 
     db_service = get_db_service(request.app)

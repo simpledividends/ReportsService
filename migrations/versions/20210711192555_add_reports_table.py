@@ -9,12 +9,12 @@ Create Date: 2021-07-11 19:25:55.472593
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import (
+    BOOLEAN,
     DATE,
     SMALLINT,
     TIMESTAMP,
     UUID,
     VARCHAR,
-    BOOLEAN,
 )
 
 from reports_service.db.models import parse_status_enum

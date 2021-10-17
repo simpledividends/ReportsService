@@ -83,7 +83,7 @@ class DBService(BaseModel):
         query = """
             SELECT *
             FROM reports
-            WHERE report_id = $1::UUID
+            WHERE report_id = $1::UUID and is_deleted is False
         """
         record = await self.pool.fetchrow(query, report_id)
         res = Report(**convert_period(record)) if record is not None else None
@@ -93,7 +93,7 @@ class DBService(BaseModel):
         query = """
             SELECT *
             FROM reports
-            WHERE user_id = $1::UUID
+            WHERE user_id = $1::UUID and is_deleted is False
         """
         records = await self.pool.fetch(query, user_id)
         return [Report(**convert_period(record)) for record in records]
@@ -178,7 +178,7 @@ class DBService(BaseModel):
                 , year = $7::SMALLINT
                 , parse_note = $8::VARCHAR
                 , parser_version = $9::VARCHAR
-            WHERE report_id = $1::UUID
+            WHERE report_id = $1::UUID and is_deleted is False
         """
         if report_info is not None:
             info_values = (
@@ -205,8 +205,9 @@ class DBService(BaseModel):
     ) -> tp.List[SimpleReportRow]:
         query = """
             SELECT row_n, name, income_amount, income_date, payed_tax_amount
-            FROM report_rows
-            WHERE report_id = $1::UUID
+            FROM report_rows rr
+                JOIN reports r on r.report_id = rr.report_id
+            WHERE rr.report_id = $1::UUID and r.is_deleted is False
             ORDER BY row_n
         """
         records = await self.pool.fetch(query, report_id)

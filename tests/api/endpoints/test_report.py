@@ -1,6 +1,7 @@
 import base64
 import os.path
 import typing as tp
+from datetime import datetime
 from http import HTTPStatus
 from tempfile import NamedTemporaryFile
 from uuid import uuid4
@@ -157,6 +158,12 @@ def test_get_reports_success(
     create_db_object(make_db_report(user_id=user_1_id, filename="report_1"))
     create_db_object(make_db_report(user_id=user_2_id, filename="report_2"))
     create_db_object(make_db_report(user_id=user_1_id, filename="report_3"))
+    deleted_report = make_db_report(
+        user_id=user_1_id,
+        filename="report_4",
+        is_deleted=True,
+    )
+    create_db_object(deleted_report)
 
     access_token = "some_token"
     fake_auth_server.add_ok_response(access_token, user_1_id)
@@ -289,6 +296,25 @@ def test_get_report_when_not_exist(
         )
     assert resp.status_code == HTTPStatus.NOT_FOUND
 
+
+def test_get_report_when_deleted(
+    client: TestClient,
+    fake_auth_server: FakeAuthServer,
+    create_db_object: DBObjectCreator,
+) -> None:
+    user_id = uuid4()
+    report = make_db_report(user_id=user_id, is_deleted=True)
+    create_db_object(report)
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+    with client:
+        resp = client.get(
+            GET_REPORT_PATH.format(report_id=report.report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    assert resp.status_code == HTTPStatus.NOT_FOUND
+
+
 @pytest.mark.parametrize("n_rows", (3, 0))
 def test_delete_report_success(
     client: TestClient,
@@ -333,6 +359,38 @@ def test_delete_report_success(
     rows = db_session.query(ReportRowsTable).all()
     assert len(rows) == 1
     assert rows[0].name == "nnn"
+
+
+def test_delete_report_when_already_deleted(
+    client: TestClient,
+    db_session: orm.Session,
+    create_db_object: DBObjectCreator,
+    fake_auth_server: FakeAuthServer,
+) -> None:
+    user_id = uuid4()
+    report = make_db_report(
+        user_id=user_id,
+        is_deleted=True,
+        deleted_at=datetime(2021, 10, 17),
+    )
+    create_db_object(report)
+
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+
+    with client:
+        resp = client.delete(
+            DELETE_REPORT_PATH.format(report_id=report.report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    assert resp.status_code == HTTPStatus.NOT_FOUND
+
+    # Check reports
+    reports = db_session.query(ReportsTable).all()
+    assert reports[0].is_deleted is True
+    assert reports[0].deleted_at == datetime(2021, 10, 17)
+
 
 @pytest.mark.parametrize("headers", ({}, {"Authorization": "Bearer token"}))
 def test_delete_report_forbidden_when_not_authenticated(
