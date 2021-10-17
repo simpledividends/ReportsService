@@ -21,13 +21,15 @@ class ReportsTable(Base):
     filename = Column(pg.VARCHAR(128), nullable=False)
     created_at = Column(pg.TIMESTAMP, nullable=False)
     parse_status = Column(parse_status_enum, nullable=False)
-    parsed_at = Column(pg.TIMESTAMP, nullable=True, default=None)
-    broker = Column(pg.VARCHAR(64), nullable=True, default=None)
-    period_start = Column(pg.DATE, nullable=True, default=None)
-    period_end = Column(pg.DATE, nullable=True, default=None)
-    year = Column(pg.SMALLINT, nullable=True, default=None)
-    parse_note = Column(pg.VARCHAR(256), nullable=True, default=None)
-    parser_version = Column(pg.VARCHAR(64), nullable=True, default=None)
+    parsed_at = Column(pg.TIMESTAMP, nullable=True)
+    broker = Column(pg.VARCHAR(64), nullable=True)
+    period_start = Column(pg.DATE, nullable=True)
+    period_end = Column(pg.DATE, nullable=True)
+    year = Column(pg.SMALLINT, nullable=True)
+    parse_note = Column(pg.VARCHAR(256), nullable=True)
+    parser_version = Column(pg.VARCHAR(64), nullable=True)
+    is_deleted = Column(pg.BOOLEAN, nullable=False, server_default="0")
+    deleted_at = Column(pg.TIMESTAMP, nullable=True)
 
 
 class ReportRowsTable(Base):
