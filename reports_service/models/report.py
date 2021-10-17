@@ -67,3 +67,15 @@ class Report(BaseReportInfo):
 
 class Reports(BaseModel):
     reports: tp.List[Report]
+
+
+class SimpleReportRow(BaseModel):
+    row_n: int
+    name: str
+    income_amount: float
+    income_date: date
+    payed_tax_amount: tp.Optional[float]
+
+
+class SimpleReportRows(BaseModel):
+    rows: tp.List[SimpleReportRow]

@@ -10,6 +10,7 @@ from reports_service.models.report import (
     ParseStatus,
     ParsedReportRow,
     Report,
+    SimpleReportRow,
 )
 from reports_service.utils import utc_now
 
@@ -197,3 +198,16 @@ class DBService(BaseModel):
             utc_now(),
             *info_values,
         )
+
+    async def get_report_rows(
+        self,
+        report_id: UUID,
+    ) -> tp.List[SimpleReportRow]:
+        query = """
+            SELECT row_n, name, income_amount, income_date, payed_tax_amount
+            FROM report_rows
+            WHERE report_id = $1::UUID
+            ORDER BY row_n
+        """
+        records = await self.pool.fetch(query, report_id)
+        return [SimpleReportRow(**record) for record in records]

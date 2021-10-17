@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import orm
 
 from reports_service.db.models import ReportRowsTable, ReportsTable
-from reports_service.models.report import ParseStatus
+from reports_service.models.report import ParseStatus, SimpleReportRow
 from reports_service.models.user import UserRole
 from reports_service.utils import utc_now
 from tests.helpers import (
@@ -24,6 +24,7 @@ from tests.helpers import (
 from tests.utils import ApproxDatetime
 
 UPLOAD_PARSED_REPORT_PATH_TEMPLATE = "/reports/{report_id}/parsed"
+GET_REPORT_ROWS_PATH = "/reports/{report_id}/rows"
 
 
 STANDARD_PARSING_RESULT_BODY: tp.Dict[str, tp.Any] = {
@@ -282,5 +283,131 @@ def test_upload_report_forbidden_whet_not_service_role(
             json=NOT_PARSED_PARSING_RESULT_BODY,
             headers={"Authorization": f"Bearer {access_token}"},
         )
-    assert resp.status_code == HTTPStatus.FORBIDDEN
-    assert resp.json()["errors"][0]["error_key"] == "forbidden"
+    assert_forbidden(resp, "forbidden")
+
+
+@pytest.mark.parametrize("n_rows", (3, 0))
+def test_get_report_rows_success(
+    client: TestClient,
+    create_db_object: DBObjectCreator,
+    fake_auth_server: FakeAuthServer,
+    n_rows: int,
+) -> None:
+    user_id = uuid4()
+    report_id = uuid4()
+    other_report_id = uuid4()
+    report = make_db_report(
+        report_id,
+        user_id=user_id,
+        parse_status=ParseStatus.parsed,
+    )
+    create_db_object(report)
+    other_report = make_db_report(
+        other_report_id,
+        user_id=user_id,
+        parse_status=ParseStatus.parsed,
+    )
+    create_db_object(other_report)
+    for i in range(1, n_rows + 1):
+        create_db_object(make_db_report_row(report_id, row_n=i, name=f"a{i}"))
+    create_db_object(make_db_report_row(other_report_id, row_n=1))
+
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+
+    with client:
+        resp = client.get(
+            GET_REPORT_ROWS_PATH.format(report_id=report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    assert resp.status_code == HTTPStatus.OK
+    rows = resp.json()["rows"]
+    assert [r["name"] for r in rows] == [f"a{i}" for i in range(1, n_rows + 1)]
+    expected_keys = SimpleReportRow.schema()["properties"].keys()
+    for row in rows:
+        assert set(row.keys()) == set(expected_keys)
+
+
+@pytest.mark.parametrize("headers", ({}, {"Authorization": "Bearer token"}))
+def test_get_report_rows_forbidden_when_not_authenticated(
+    client: TestClient,
+    headers: tp.Dict[str, str],
+) -> None:
+    with client:
+        resp = client.get(
+            GET_REPORT_ROWS_PATH.format(report_id=uuid4()),
+            headers=headers,
+        )
+    assert_forbidden(resp)
+
+
+def test_get_report_rows_forbidden_when_foreign_report(
+    client: TestClient,
+    create_db_object: DBObjectCreator,
+    fake_auth_server: FakeAuthServer,
+) -> None:
+    user_id = uuid4()
+    foreign_report_id = uuid4()
+    foreign_report = make_db_report(
+        foreign_report_id,
+        user_id=uuid4(),
+        parse_status=ParseStatus.parsed,
+    )
+    create_db_object(foreign_report)
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+    with client:
+        resp = client.get(
+            GET_REPORT_ROWS_PATH.format(report_id=foreign_report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    assert_forbidden(resp, "forbidden")
+
+
+@pytest.mark.parametrize(
+    "parse_status",
+    (
+        ParseStatus.in_progress,
+        ParseStatus.not_parsed,
+    )
+)
+def test_get_report_rows_when_not_parsed(
+    client: TestClient,
+    create_db_object: DBObjectCreator,
+    fake_auth_server: FakeAuthServer,
+    parse_status: ParseStatus,
+) -> None:
+    user_id = uuid4()
+    report_id = uuid4()
+    report = make_db_report(
+        report_id,
+        user_id=user_id,
+        parse_status=parse_status,
+    )
+    create_db_object(report)
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+    with client:
+        resp = client.get(
+            GET_REPORT_ROWS_PATH.format(report_id=report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    assert resp.status_code == HTTPStatus.CONFLICT
+
+
+def test_get_report_rows_when_not_exist(
+    client: TestClient,
+    create_db_object: DBObjectCreator,
+    fake_auth_server: FakeAuthServer,
+) -> None:
+    user_id = uuid4()
+    report_id = uuid4()
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+    with client:
+        resp = client.get(
+            GET_REPORT_ROWS_PATH.format(report_id=report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    assert resp.status_code == HTTPStatus.NOT_FOUND

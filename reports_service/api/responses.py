@@ -54,3 +54,21 @@ not_found = {
         },
     },
 }
+
+not_parsed = {
+    "model": ErrorResponse,
+    "description": "Error: Report not found",
+    "content": {
+        "application/json": {
+            "example": ErrorResponse(
+                errors=[
+                    Error(
+                        error_key="report_not_parsed",
+                        error_message="Report is not parsed (yet)",
+                        error_loc=None,
+                    ),
+                ],
+            ),
+        },
+    },
+}

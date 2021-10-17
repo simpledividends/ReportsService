@@ -68,9 +68,9 @@ class FakeAuthServer:
             )
 
 
-def assert_forbidden(response: Response) -> None:
-    assert response.status_code == HTTPStatus.FORBIDDEN
-    assert response.json()["errors"][0]["error_key"] == "forbidden!"
+def assert_forbidden(resp: Response, error_key: str = "forbidden!") -> None:
+    assert resp.status_code == HTTPStatus.FORBIDDEN
+    assert resp.json()["errors"][0]["error_key"] == error_key
 
 
 def assert_all_tables_are_empty(
@@ -119,13 +119,14 @@ def make_db_report(
 def make_db_report_row(
     report_id: tp.Optional[UUID] = None,
     row_n: int = 1,
-    isin: str = "isin"
+    isin: str = "isin",
+    name: str = "name",
 ) -> ReportRowsTable:
     return ReportRowsTable(
         report_id=str(report_id or uuid4()),
         row_n=row_n,
         isin=isin,
-        name="name",
+        name=name,
         tax_rate="13",
         country_code="840",
         income_amount=15.3,
