@@ -44,7 +44,7 @@ class ParsedReportInfo(BaseModel):
 
 
 class ExtendedParsedReportInfo(ParsedReportInfo):
-    year: int
+    year: tp.Optional[int]
 
 
 class ParsedReport(ParsedReportInfo):
@@ -54,11 +54,16 @@ class ParsedReport(ParsedReportInfo):
 class ParsingResult(BaseModel):
     parsed_report: tp.Optional[ParsedReport]
     message: tp.Optional[str]
-    is_parsed: tp.Optional[bool]
+    is_parsed: bool
 
 
-class Report(BaseReportInfo, ExtendedParsedReportInfo):
-    pass
+class Report(BaseReportInfo):
+    parsed_at: tp.Optional[datetime]
+    broker: tp.Optional[str]
+    period: tp.Optional[Period]
+    year: tp.Optional[int]
+    parse_note: tp.Optional[str]
+    parser_version: tp.Optional[str]
 
 
 class Reports(BaseModel):

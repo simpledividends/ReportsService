@@ -54,8 +54,10 @@ async def upload_parsing_result(
 
     if parsing_result.is_parsed and parsing_result.parsed_report is not None:
         parse_status = ParseStatus.parsed
-        parsed_dict = parsing_result.parsed_report.dict()
-        rows = parsed_dict.pop("rows")
+        parsed_report = parsing_result.parsed_report
+        rows = parsed_report.rows
+        parsed_dict = parsed_report.dict()
+        parsed_dict.pop("rows")
         if parsed_dict["period"][0].year == parsed_dict["period"][1].year:
             year = parsed_dict["period"][0].year
         else:

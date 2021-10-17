@@ -1,7 +1,7 @@
 import typing as tp
 from uuid import UUID, uuid4
 
-from asyncpg import Pool
+from asyncpg import Pool, Record
 from pydantic import BaseModel
 
 from reports_service.log import app_logger
@@ -12,6 +12,17 @@ from reports_service.models.report import (
     Report,
 )
 from reports_service.utils import utc_now
+
+
+def convert_period(record: Record) -> tp.Dict[str, tp.Any]:
+    record_dict = dict(**record)
+    record_dict["period"] = (
+        record_dict.pop("period_start"),
+        record_dict.pop("period_end"),
+    )
+    if record_dict["period"] == (None, None):
+        record_dict["period"] = None
+    return record_dict
 
 
 class DBService(BaseModel):
@@ -49,8 +60,13 @@ class DBService(BaseModel):
                 , filename
                 , created_at
                 , parse_status
+                , parsed_at
                 , broker
+                , period_start
+                , period_end
                 , year
+                , parse_note
+                , parser_version
         """
         record = await self.pool.fetchrow(
             query,
@@ -60,6 +76,8 @@ class DBService(BaseModel):
             utc_now(),
             ParseStatus.in_progress,
         )
+        return Report(**convert_period(record))
+
     async def get_report(self, report_id: UUID) -> Report:
         query = """
             SELECT *
@@ -77,11 +95,11 @@ class DBService(BaseModel):
             WHERE user_id = $1::UUID
         """
         records = await self.pool.fetch(query, user_id)
-        return [Report(**record) for record in records]
+        return [Report(**convert_period(record)) for record in records]
 
     async def delete_report_rows(self, report_id: UUID) -> None:
         query = """
-            DELETE FROM TABLE report_rows
+            DELETE FROM report_rows
             WHERE report_id = $1::UUID
         """
         await self.pool.execute(query, report_id)
@@ -92,7 +110,7 @@ class DBService(BaseModel):
         rows: tp.List[ParsedReportRow],
     ) -> None:
         query = """
-            INSERT INTO reports
+            INSERT INTO report_rows
                 (
                     report_id
                     , row_n
@@ -155,24 +173,26 @@ class DBService(BaseModel):
             UPDATE reports
             SET
                 parse_status = $2::parse_status_enum
-                parsed_at = $3::TIMESTAMP
-                broker = $4::broker_enum
-                period = $5::DATERANGE
-                year = $6::SMALLINT
-                parse_note = $7::VARCHAR
-                parser_version = $8::VARCHAR
+                , parsed_at = $3::TIMESTAMP
+                , broker = $4::VARCHAR
+                , period_start = $5::DATE
+                , period_end = $6::DATE
+                , year = $7::SMALLINT
+                , parse_note = $8::VARCHAR
+                , parser_version = $9::VARCHAR
             WHERE report_id = $1::UUID
         """
         if report_info is not None:
             info_values = (
                 report_info.broker,
-                report_info.period,
+                report_info.period[0],
+                report_info.period[1],
                 report_info.year,
                 report_info.note,
                 report_info.version,
             )
         else:
-            info_values = (None, None, None, None, None)
+            info_values = (None, None, None, None, None, None)
         await self.pool.execute(
             query,
             report_id,
