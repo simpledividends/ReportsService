@@ -2,15 +2,9 @@ from sqlalchemy import Column, ForeignKey, orm
 from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.ext.declarative import DeclarativeMeta, declarative_base
 
-from reports_service.models.report import Broker, ParseStatus
+from reports_service.models.report import ParseStatus
 
 Base: DeclarativeMeta = declarative_base()
-
-broker_enum = pg.ENUM(
-    *Broker.__members__.keys(),
-    name="broker_enum",
-    create_type=False,
-)
 
 parse_status_enum = pg.ENUM(
     *ParseStatus.__members__.keys(),
@@ -28,6 +22,7 @@ class ReportsTable(Base):
     created_at = Column(pg.TIMESTAMP, nullable=False)
     parse_status = Column(parse_status_enum, nullable=False)
     parsed_at = Column(pg.TIMESTAMP, nullable=True, default=None)
+    broker = Column(pg.VARCHAR(64), nullable=True, default=None)
     broker = Column(broker_enum, nullable=True, default=None)
     period = Column(pg.DATERANGE, nullable=True, default=None)
     year = Column(pg.SMALLINT, nullable=True, default=None)
