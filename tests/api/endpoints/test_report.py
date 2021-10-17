@@ -1,6 +1,7 @@
 import base64
 import os.path
 import typing as tp
+from datetime import datetime
 from http import HTTPStatus
 from tempfile import NamedTemporaryFile
 from uuid import uuid4
@@ -11,7 +12,7 @@ from botocore.client import BaseClient
 from fastapi.testclient import TestClient
 from sqlalchemy import orm
 
-from reports_service.db.models import ReportsTable
+from reports_service.db.models import ReportRowsTable, ReportsTable
 from reports_service.models.report import ParseStatus
 from reports_service.settings import ServiceConfig
 from reports_service.utils import utc_now
@@ -21,12 +22,14 @@ from tests.helpers import (
     assert_all_tables_are_empty,
     assert_forbidden,
     make_db_report,
+    make_db_report_row,
 )
 from tests.utils import AnyUUID, ApproxDatetime
 
 UPLOAD_REPORT_PATH = "/reports"
 GET_REPORTS_PATH = "/reports"
 GET_REPORT_PATH = "/reports/{report_id}"
+DELETE_REPORT_PATH = "/reports/{report_id}"
 
 
 def test_upload_report_success(
@@ -155,6 +158,12 @@ def test_get_reports_success(
     create_db_object(make_db_report(user_id=user_1_id, filename="report_1"))
     create_db_object(make_db_report(user_id=user_2_id, filename="report_2"))
     create_db_object(make_db_report(user_id=user_1_id, filename="report_3"))
+    deleted_report = make_db_report(
+        user_id=user_1_id,
+        filename="report_4",
+        is_deleted=True,
+    )
+    create_db_object(deleted_report)
 
     access_token = "some_token"
     fake_auth_server.add_ok_response(access_token, user_1_id)
@@ -283,6 +292,153 @@ def test_get_report_when_not_exist(
     with client:
         resp = client.get(
             GET_REPORT_PATH.format(report_id=report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    assert resp.status_code == HTTPStatus.NOT_FOUND
+
+
+def test_get_report_when_deleted(
+    client: TestClient,
+    fake_auth_server: FakeAuthServer,
+    create_db_object: DBObjectCreator,
+) -> None:
+    user_id = uuid4()
+    report = make_db_report(user_id=user_id, is_deleted=True)
+    create_db_object(report)
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+    with client:
+        resp = client.get(
+            GET_REPORT_PATH.format(report_id=report.report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    assert resp.status_code == HTTPStatus.NOT_FOUND
+
+
+@pytest.mark.parametrize("n_rows", (3, 0))
+def test_delete_report_success(
+    client: TestClient,
+    db_session: orm.Session,
+    create_db_object: DBObjectCreator,
+    fake_auth_server: FakeAuthServer,
+    n_rows: int,
+) -> None:
+    user_id = uuid4()
+    report_id = uuid4()
+    other_report_id = uuid4()
+    create_db_object(make_db_report(report_id, user_id=user_id, filename="a"))
+    create_db_object(make_db_report(other_report_id, user_id=user_id))
+    for i in range(1, n_rows + 1):
+        create_db_object(make_db_report_row(report_id, row_n=i))
+    create_db_object(make_db_report_row(other_report_id, row_n=1, name="nnn"))
+
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+
+    with client:
+        resp = client.delete(
+            DELETE_REPORT_PATH.format(report_id=report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    assert resp.status_code == HTTPStatus.NO_CONTENT
+
+    # Check reports
+    reports = (
+        db_session
+        .query(ReportsTable)
+        .order_by(ReportsTable.filename)
+        .all()
+    )
+    assert len(reports) == 2
+    assert reports[0].is_deleted is True
+    assert reports[0].deleted_at == ApproxDatetime(utc_now())
+    assert reports[1].is_deleted is False
+
+    # Check report rows
+    rows = db_session.query(ReportRowsTable).all()
+    assert len(rows) == 1
+    assert rows[0].name == "nnn"
+
+
+def test_delete_report_when_already_deleted(
+    client: TestClient,
+    db_session: orm.Session,
+    create_db_object: DBObjectCreator,
+    fake_auth_server: FakeAuthServer,
+) -> None:
+    user_id = uuid4()
+    report = make_db_report(
+        user_id=user_id,
+        is_deleted=True,
+        deleted_at=datetime(2021, 10, 17),
+    )
+    create_db_object(report)
+
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+
+    with client:
+        resp = client.delete(
+            DELETE_REPORT_PATH.format(report_id=report.report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    assert resp.status_code == HTTPStatus.NOT_FOUND
+
+    # Check reports
+    reports = db_session.query(ReportsTable).all()
+    assert reports[0].is_deleted is True
+    assert reports[0].deleted_at == datetime(2021, 10, 17)
+
+
+@pytest.mark.parametrize("headers", ({}, {"Authorization": "Bearer token"}))
+def test_delete_report_forbidden_when_not_authenticated(
+    client: TestClient,
+    headers: tp.Dict[str, str],
+) -> None:
+    with client:
+        resp = client.delete(
+            DELETE_REPORT_PATH.format(report_id=uuid4()),
+            headers=headers,
+        )
+    assert_forbidden(resp)
+
+
+def test_delete_report_forbidden_when_foreign_report(
+    client: TestClient,
+    create_db_object: DBObjectCreator,
+    fake_auth_server: FakeAuthServer,
+) -> None:
+    user_id = uuid4()
+    foreign_report_id = uuid4()
+    foreign_report = make_db_report(
+        foreign_report_id,
+        user_id=uuid4(),
+        parse_status=ParseStatus.parsed,
+    )
+    create_db_object(foreign_report)
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+    with client:
+        resp = client.get(
+            DELETE_REPORT_PATH.format(report_id=foreign_report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    assert_forbidden(resp, "forbidden")
+
+
+def test_delete_report_when_not_exist(
+    client: TestClient,
+    fake_auth_server: FakeAuthServer,
+) -> None:
+    user_id = uuid4()
+    report_id = uuid4()
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+    with client:
+        resp = client.get(
+            DELETE_REPORT_PATH.format(report_id=report_id),
             headers={"Authorization": f"Bearer {access_token}"},
         )
     assert resp.status_code == HTTPStatus.NOT_FOUND

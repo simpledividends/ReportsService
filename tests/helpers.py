@@ -104,6 +104,8 @@ def make_db_report(
     parse_status: ParseStatus = ParseStatus.in_progress,
     broker: tp.Optional[str] = None,
     year: tp.Optional[int] = None,
+    is_deleted: bool = False,
+    deleted_at: tp.Optional[datetime] = None,
 ) -> ReportsTable:
     return ReportsTable(
         report_id=str(report_id or uuid4()),
@@ -113,6 +115,8 @@ def make_db_report(
         parse_status=parse_status,
         broker=broker,
         year=year,
+        is_deleted=is_deleted,
+        deleted_at=deleted_at,
     )
 
 

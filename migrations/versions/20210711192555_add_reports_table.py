@@ -9,6 +9,7 @@ Create Date: 2021-07-11 19:25:55.472593
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import (
+    BOOLEAN,
     DATE,
     SMALLINT,
     TIMESTAMP,
@@ -35,12 +36,14 @@ def upgrade():
         sa.Column("created_at", TIMESTAMP, nullable=False),
         sa.Column("parse_status", parse_status_enum, nullable=False),
         sa.Column("parsed_at", TIMESTAMP, nullable=True),
-        sa.Column("broker", VARCHAR(64), nullable=True, default=None),
-        sa.Column("period_start", DATE, nullable=True, default=None),
-        sa.Column("period_end", DATE, nullable=True, default=None),
-        sa.Column("year", SMALLINT, nullable=True, default=None),
-        sa.Column("parse_note", VARCHAR(256), nullable=True, default=None),
-        sa.Column("parser_version", VARCHAR(64), nullable=True, default=None),
+        sa.Column("broker", VARCHAR(64), nullable=True),
+        sa.Column("period_start", DATE, nullable=True),
+        sa.Column("period_end", DATE, nullable=True),
+        sa.Column("year", SMALLINT, nullable=True),
+        sa.Column("parse_note", VARCHAR(256), nullable=True),
+        sa.Column("parser_version", VARCHAR(64), nullable=True),
+        sa.Column("is_deleted", BOOLEAN, nullable=False, server_default="0"),
+        sa.Column("deleted_at", TIMESTAMP, nullable=True),
 
         sa.PrimaryKeyConstraint("report_id"),
     )
