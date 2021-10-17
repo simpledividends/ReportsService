@@ -99,3 +99,33 @@ async def get_report(
         raise ForbiddenException()
 
     return report
+
+
+@router.delete(
+    path="/reports/{report_id}",
+    tags=["Report"],
+    status_code=HTTPStatus.NO_CONTENT,
+    responses={
+        403: responses.forbidden,
+        404: responses.not_found,
+    },
+)
+async def delete_report(
+    request: Request,
+    report_id: UUID,
+    user: User = Depends(get_request_user)
+) -> Report:
+    app_logger.info(f"User {user.user_id} want to delete report {report_id}")
+
+    db_service = get_db_service(request.app)
+
+    report = await db_service.get_report(report_id)
+    if report is None:
+        raise NotFoundException()
+    if report.user_id != user.user_id:
+        raise ForbiddenException()
+
+    await db_service.delete_report_rows(report_id)
+    await db_service.set_report_deleted(report_id)
+
+    app_logger.info(f"Report {report_id} was deleted")

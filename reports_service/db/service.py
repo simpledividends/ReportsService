@@ -211,3 +211,13 @@ class DBService(BaseModel):
         """
         records = await self.pool.fetch(query, report_id)
         return [SimpleReportRow(**record) for record in records]
+
+    async def set_report_deleted(self, report_id: UUID) -> None:
+        query = """
+            UPDATE reports
+            SET
+                is_deleted = True
+                , deleted_at = $2::TIMESTAMP
+            WHERE report_id = $1::UUID and is_deleted is False
+        """
+        await self.pool.execute(query, report_id, utc_now())
