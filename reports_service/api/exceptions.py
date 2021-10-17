@@ -37,3 +37,14 @@ class NotFoundException(AppException):
         error_loc: tp.Optional[tp.Sequence[str]] = None,
     ):
         super().__init__(status_code, error_key, error_message, error_loc)
+
+
+class NotParsedException(AppException):
+    def __init__(
+        self,
+        status_code: int = HTTPStatus.CONFLICT,
+        error_key: str = "report_not_parsed",
+        error_message: str = "Report is not parsed (yet)",
+        error_loc: tp.Optional[tp.Sequence[str]] = None,
+    ):
+        super().__init__(status_code, error_key, error_message, error_loc)

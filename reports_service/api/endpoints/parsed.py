@@ -6,13 +6,18 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import JSONResponse
 
 from reports_service.api import responses
-from reports_service.api.auth import get_service_user
-from reports_service.api.exceptions import NotFoundException
+from reports_service.api.auth import get_request_user, get_service_user
+from reports_service.api.exceptions import (
+    ForbiddenException,
+    NotFoundException,
+    NotParsedException,
+)
 from reports_service.log import app_logger
 from reports_service.models.report import (
     ExtendedParsedReportInfo,
     ParseStatus,
     ParsingResult,
+    SimpleReportRows,
 )
 from reports_service.models.user import User
 from reports_service.response import create_response
@@ -77,3 +82,35 @@ async def upload_parsing_result(
     app_logger.info("Parsing result saved in db")
 
     return create_response(status_code=HTTPStatus.OK)
+
+
+@router.get(
+    path="/reports/{report_id}/rows",
+    tags=["Report"],
+    status_code=HTTPStatus.OK,
+    response_model=SimpleReportRows,
+    responses={
+        403: responses.forbidden,
+        404: responses.not_found,
+        409: responses.not_parsed,
+    },
+)
+async def get_report_rows(
+    request: Request,
+    report_id: UUID,
+    user: User = Depends(get_request_user)
+) -> SimpleReportRows:
+    app_logger.info(f"User {user.user_id} requested report {report_id} rows")
+
+    db_service = get_db_service(request.app)
+
+    report = await db_service.get_report(report_id)
+    if report is None:
+        raise NotFoundException()
+    if report.user_id != user.user_id:
+        raise ForbiddenException()
+    if report.parse_status != ParseStatus.parsed:
+        raise NotParsedException()
+
+    rows = await db_service.get_report_rows(report_id)
+    return SimpleReportRows(rows=rows)
