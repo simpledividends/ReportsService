@@ -1,19 +1,11 @@
 import typing as tp
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from uuid import UUID
 
 from pydantic.main import BaseModel
 
-
-class Broker(str, Enum):
-    tinkoff = "tinkoff"
-    alfa = "alfa"
-    bcs = "bcs"
-    open = "open"
-    finam = "finam"
-    vtb = "vtb"
-    sber = "sber"
+Period = tp.Tuple[date, date]
 
 
 class ParseStatus(str, Enum):
@@ -22,11 +14,56 @@ class ParseStatus(str, Enum):
     not_parsed = "not_parsed"
 
 
-class Report(BaseModel):
+class BaseReportInfo(BaseModel):
     report_id: UUID
     user_id: UUID
     filename: str
     created_at: datetime
     parse_status: ParseStatus
-    broker: tp.Optional[Broker]
+
+
+class ParsedReportRow(BaseModel):
+    isin: str
+    name: str
+    tax_rate: str
+    country_code: str
+    income_amount: float
+    income_date: date
+    income_currency_rate: float
+    tax_payment_date: tp.Optional[date]
+    payed_tax_amount: tp.Optional[float]
+    tax_payment_currency_rate: tp.Optional[float]
+
+
+class ParsedReportInfo(BaseModel):
+    broker: str
+    version: str
+    period: Period
+    note: tp.Optional[str]
+
+
+class ExtendedParsedReportInfo(ParsedReportInfo):
     year: tp.Optional[int]
+
+
+class ParsedReport(ParsedReportInfo):
+    rows: tp.List[ParsedReportRow]
+
+
+class ParsingResult(BaseModel):
+    parsed_report: tp.Optional[ParsedReport]
+    message: tp.Optional[str]
+    is_parsed: bool
+
+
+class Report(BaseReportInfo):
+    parsed_at: tp.Optional[datetime]
+    broker: tp.Optional[str]
+    period: tp.Optional[Period]
+    year: tp.Optional[int]
+    parse_note: tp.Optional[str]
+    parser_version: tp.Optional[str]
+
+
+class Reports(BaseModel):
+    reports: tp.List[Report]

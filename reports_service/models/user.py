@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class UserRole(str, Enum):
     user = "user"
     admin = "admin"
+    service = "service"
 
 
 class User(BaseModel):
