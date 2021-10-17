@@ -7,6 +7,7 @@ from starlette.responses import JSONResponse
 
 from reports_service.api import responses
 from reports_service.api.auth import get_service_user
+from reports_service.api.exceptions import NotFoundException
 from reports_service.log import app_logger
 from reports_service.models.report import (
     ExtendedParsedReportInfo,
@@ -26,6 +27,7 @@ router = APIRouter()
     status_code=HTTPStatus.CREATED,
     responses={
         403: responses.forbidden,
+        404: responses.not_found,
         422: responses.unprocessable_entity,
     }
 )
@@ -42,6 +44,11 @@ async def upload_parsing_result(
     )
 
     db_service = get_db_service(request.app)
+
+    report = await db_service.get_report(report_id)
+    if report is None:
+        raise NotFoundException()
+
     await db_service.delete_report_rows(report_id)
     app_logger.info("Old rows deleted")
 

@@ -60,7 +60,15 @@ class DBService(BaseModel):
             utc_now(),
             ParseStatus.in_progress,
         )
-        return Report(**record)
+    async def get_report(self, report_id: UUID) -> Report:
+        query = """
+            SELECT *
+            FROM reports
+            WHERE report_id = $1::UUID
+        """
+        record = await self.pool.fetchrow(query, report_id)
+        res = Report(**convert_period(record)) if record is not None else None
+        return res
 
     async def get_reports(self, user_id: UUID) -> tp.List[Report]:
         query = """
