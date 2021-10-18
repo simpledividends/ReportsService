@@ -11,7 +11,11 @@ from sqlalchemy import inspect, orm, text
 
 from reports_service.auth import AUTH_SERVISE_AUTHORIZATION_HEADER
 from reports_service.db.models import Base, ReportRowsTable, ReportsTable
-from reports_service.models.report import ParseStatus, ParsedReportRow
+from reports_service.models.report import (
+    ParseStatus,
+    ParsedReportRow,
+    PaymentStatus,
+)
 from reports_service.models.user import UserRole
 
 DBObjectCreator = tp.Callable[[Base], None]
@@ -102,6 +106,7 @@ def make_db_report(
     filename: str = "some_filename",
     created_at: datetime = datetime(2021, 10, 11),
     parse_status: ParseStatus = ParseStatus.in_progress,
+    payment_status: PaymentStatus = PaymentStatus.not_payed,
     broker: tp.Optional[str] = None,
     year: tp.Optional[int] = None,
     is_deleted: bool = False,
@@ -113,6 +118,7 @@ def make_db_report(
         filename=filename,
         created_at=created_at,
         parse_status=parse_status,
+        payment_status=payment_status,
         broker=broker,
         year=year,
         is_deleted=is_deleted,

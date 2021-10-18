@@ -17,7 +17,8 @@ from sqlalchemy.dialects.postgresql import (
     VARCHAR,
 )
 
-from reports_service.db.models import parse_status_enum
+from reports_service.db.models import parse_status_enum, payment_status_enum
+from reports_service.models.report import PaymentStatus
 
 # revision identifiers, used by Alembic.
 revision = "7a832704ff11"
@@ -28,6 +29,7 @@ depends_on = None
 
 def upgrade():
     parse_status_enum.create(op.get_bind())
+    payment_status_enum.create(op.get_bind())
     op.create_table(
         "reports",
         sa.Column("report_id", UUID, nullable=False),
@@ -35,6 +37,12 @@ def upgrade():
         sa.Column("filename", VARCHAR(128), nullable=False),
         sa.Column("created_at", TIMESTAMP, nullable=False),
         sa.Column("parse_status", parse_status_enum, nullable=False),
+        sa.Column(
+            "payment_status",
+            payment_status_enum,
+            nullable=False,
+            server_default=PaymentStatus.not_payed,
+        ),
         sa.Column("parsed_at", TIMESTAMP, nullable=True),
         sa.Column("broker", VARCHAR(64), nullable=True),
         sa.Column("period_start", DATE, nullable=True),
@@ -59,3 +67,4 @@ def downgrade():
     op.drop_index(op.f("ix_reports_user_id"), table_name="users")
     op.drop_table("reports")
     op.execute("DROP TYPE parse_status_enum")
+    op.execute("DROP TYPE payment_status_enum")

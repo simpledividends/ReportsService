@@ -2,13 +2,19 @@ from sqlalchemy import Column, ForeignKey, orm
 from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.ext.declarative import DeclarativeMeta, declarative_base
 
-from reports_service.models.report import ParseStatus
+from reports_service.models.report import ParseStatus, PaymentStatus
 
 Base: DeclarativeMeta = declarative_base()
 
 parse_status_enum = pg.ENUM(
     *ParseStatus.__members__.keys(),
     name="parse_status_enum",
+    create_type=False,
+)
+
+payment_status_enum = pg.ENUM(
+    *PaymentStatus.__members__.keys(),
+    name="payment_status_enum",
     create_type=False,
 )
 
@@ -20,6 +26,11 @@ class ReportsTable(Base):
     user_id = Column(pg.UUID, nullable=False)
     filename = Column(pg.VARCHAR(128), nullable=False)
     created_at = Column(pg.TIMESTAMP, nullable=False)
+    payment_status = Column(
+        payment_status_enum,
+        nullable=False,
+        server_default=PaymentStatus.not_payed,
+    )
     parse_status = Column(parse_status_enum, nullable=False)
     parsed_at = Column(pg.TIMESTAMP, nullable=True)
     broker = Column(pg.VARCHAR(64), nullable=True)

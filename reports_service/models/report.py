@@ -14,11 +14,19 @@ class ParseStatus(str, Enum):
     not_parsed = "not_parsed"
 
 
+class PaymentStatus(str, Enum):
+    not_payed = "not_payed"
+    in_progress = "in_progress"
+    payed = "payed"
+    error = "error"
+
+
 class BaseReportInfo(BaseModel):
     report_id: UUID
     user_id: UUID
     filename: str
     created_at: datetime
+    payment_status: PaymentStatus
     parse_status: ParseStatus
 
 
@@ -79,3 +87,19 @@ class SimpleReportRow(BaseModel):
 
 class SimpleReportRows(BaseModel):
     rows: tp.List[SimpleReportRow]
+
+
+class DetailedReportRow(BaseModel):
+    name_full: str
+    tax_rate: str
+    country_code: str
+    income_amount: float
+    income_date: date
+    income_currency_rate: float
+    tax_payment_date: tp.Optional[date]
+    payed_tax_amount: tp.Optional[float]
+    tax_payment_currency_rate: tp.Optional[float]
+
+
+class DetailedReportRows(BaseModel):
+    rows: tp.List[DetailedReportRow]
