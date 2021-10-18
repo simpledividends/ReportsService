@@ -61,6 +61,7 @@ class DBService(BaseModel):
                 , filename
                 , created_at
                 , parse_status
+                , payment_status
                 , parsed_at
                 , broker
                 , period_start

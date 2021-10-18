@@ -14,11 +14,19 @@ class ParseStatus(str, Enum):
     not_parsed = "not_parsed"
 
 
+class PaymentStatus(str, Enum):
+    not_payed = "not_payed"
+    in_progress = "in_progress"
+    payed = "payed"
+    error = "error"
+
+
 class BaseReportInfo(BaseModel):
     report_id: UUID
     user_id: UUID
     filename: str
     created_at: datetime
+    payment_status: PaymentStatus
     parse_status: ParseStatus
 
 

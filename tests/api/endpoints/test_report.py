@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import orm
 
 from reports_service.db.models import ReportRowsTable, ReportsTable
-from reports_service.models.report import ParseStatus
+from reports_service.models.report import ParseStatus, PaymentStatus, Report
 from reports_service.settings import ServiceConfig
 from reports_service.utils import utc_now
 from tests.helpers import (
@@ -71,6 +71,7 @@ def test_upload_report_success(
         "filename": filename,
         "created_at": ApproxDatetime(now),
         "parse_status": ParseStatus.in_progress,
+        "payment_status": PaymentStatus.not_payed,
         "parsed_at": None,
         "broker": None,
         "period": None,
@@ -178,6 +179,8 @@ def test_get_reports_success(
     reports = resp.json()["reports"]
     report_names = [r["filename"] for r in reports]
     assert sorted(report_names) == ["report_1", "report_3"]
+    for report in reports:
+        assert set(report.keys()) == set(Report.schema()["properties"].keys())
 
 
 def test_get_reports_when_no_user_reports(
@@ -239,10 +242,20 @@ def test_get_report_success(
         )
 
     assert resp.status_code == HTTPStatus.OK
-    resp_dict = resp.json()
-    assert resp_dict["filename"] == "report_1"
-    assert resp_dict["report_id"] == report.report_id
-    assert resp_dict["user_id"] == str(user_1_id)
+    assert resp.json() == {
+        "report_id": report.report_id,
+        "user_id": str(user_1_id),
+        "filename": "report_1",
+        "created_at": report.created_at.isoformat(),
+        "parse_status": ParseStatus.in_progress,
+        "payment_status": PaymentStatus.not_payed,
+        "parsed_at": None,
+        "broker": None,
+        "period": None,
+        "year": None,
+        "parse_note": None,
+        "parser_version": None,
+    }
 
 
 @pytest.mark.parametrize("headers", ({}, {"Authorization": "Bearer token"}))
