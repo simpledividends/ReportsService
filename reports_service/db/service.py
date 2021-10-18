@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from reports_service.log import app_logger
 from reports_service.models.report import (
+    DetailedReportRow,
     ExtendedParsedReportInfo,
     ParseStatus,
     ParsedReportRow,
@@ -213,6 +214,29 @@ class DBService(BaseModel):
         """
         records = await self.pool.fetch(query, report_id)
         return [SimpleReportRow(**record) for record in records]
+
+    async def get_report_detailed_rows(
+        self,
+        report_id: UUID,
+    ) -> tp.List[DetailedReportRow]:
+        query = """
+            SELECT
+                isin || ' ' || name AS name_full
+                , tax_rate
+                , country_code
+                , income_amount
+                , income_date
+                , income_currency_rate
+                , tax_payment_date
+                , payed_tax_amount
+                , tax_payment_currency_rate
+            FROM report_rows rr
+                JOIN reports r on r.report_id = rr.report_id
+            WHERE rr.report_id = $1::UUID and r.is_deleted is False
+            ORDER BY row_n
+        """
+        records = await self.pool.fetch(query, report_id)
+        return [DetailedReportRow(**record) for record in records]
 
     async def set_report_deleted(self, report_id: UUID) -> None:
         query = """

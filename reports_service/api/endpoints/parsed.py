@@ -11,12 +11,15 @@ from reports_service.api.exceptions import (
     ForbiddenException,
     NotFoundException,
     NotParsedException,
+    NotPayedException,
 )
 from reports_service.log import app_logger
 from reports_service.models.report import (
+    DetailedReportRows,
     ExtendedParsedReportInfo,
     ParseStatus,
     ParsingResult,
+    PaymentStatus,
     SimpleReportRows,
 )
 from reports_service.models.user import User
@@ -114,3 +117,38 @@ async def get_report_rows(
 
     rows = await db_service.get_report_rows(report_id)
     return SimpleReportRows(rows=rows)
+
+
+@router.get(
+    path="/reports/{report_id}/rows/detailed",
+    tags=["Report"],
+    status_code=HTTPStatus.OK,
+    response_model=DetailedReportRows,
+    responses={
+        403: responses.forbidden,
+        404: responses.not_found,
+        409: responses.not_parsed,
+        402: responses.not_payed,
+    },
+)
+async def get_report_detailed_rows(
+    request: Request,
+    report_id: UUID,
+    user: User = Depends(get_request_user)
+) -> DetailedReportRows:
+    app_logger.info(f"User {user.user_id} requested report {report_id} rows")
+
+    db_service = get_db_service(request.app)
+
+    report = await db_service.get_report(report_id)
+    if report is None:
+        raise NotFoundException()
+    if report.user_id != user.user_id:
+        raise ForbiddenException()
+    if report.parse_status != ParseStatus.parsed:
+        raise NotParsedException()
+    if report.payment_status != PaymentStatus.payed:
+        raise NotPayedException()
+
+    rows = await db_service.get_report_detailed_rows(report_id)
+    return DetailedReportRows(rows=rows)

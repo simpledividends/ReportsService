@@ -18,7 +18,6 @@ unprocessable_entity = {
     },
 }
 
-
 forbidden = {
     "model": ErrorResponse,
     "description": "Error: Forbidden",
@@ -65,6 +64,24 @@ not_parsed = {
                     Error(
                         error_key="report_not_parsed",
                         error_message="Report is not parsed (yet)",
+                        error_loc=None,
+                    ),
+                ],
+            ),
+        },
+    },
+}
+
+not_payed = {
+    "model": ErrorResponse,
+    "description": "Error: Report not payed",
+    "content": {
+        "application/json": {
+            "example": ErrorResponse(
+                errors=[
+                    Error(
+                        error_key="report_not_payed",
+                        error_message="Report is not payed (yet)",
                         error_loc=None,
                     ),
                 ],

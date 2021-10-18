@@ -9,7 +9,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import orm
 
 from reports_service.db.models import ReportRowsTable, ReportsTable
-from reports_service.models.report import ParseStatus, SimpleReportRow
+from reports_service.models.report import (
+    DetailedReportRow,
+    ParseStatus,
+    PaymentStatus,
+    SimpleReportRow,
+)
 from reports_service.models.user import UserRole
 from reports_service.utils import utc_now
 from tests.helpers import (
@@ -25,6 +30,7 @@ from tests.utils import ApproxDatetime
 
 UPLOAD_PARSED_REPORT_PATH_TEMPLATE = "/reports/{report_id}/parsed"
 GET_REPORT_ROWS_PATH = "/reports/{report_id}/rows"
+GET_DETAILED_REPORT_ROWS_PATH = "/reports/{report_id}/rows/detailed"
 
 
 STANDARD_PARSING_RESULT_BODY: tp.Dict[str, tp.Any] = {
@@ -316,12 +322,21 @@ def test_upload_report_forbidden_whet_not_service_role(
     assert_forbidden(resp, "forbidden")
 
 
+@pytest.mark.parametrize(
+    "path,model",
+    (
+        (GET_REPORT_ROWS_PATH, SimpleReportRow),
+        (GET_DETAILED_REPORT_ROWS_PATH, DetailedReportRow),
+    )
+)
 @pytest.mark.parametrize("n_rows", (3, 0))
 def test_get_report_rows_success(
     client: TestClient,
     create_db_object: DBObjectCreator,
     fake_auth_server: FakeAuthServer,
     n_rows: int,
+    path: str,
+    model: tp.Type,
 ) -> None:
     user_id = uuid4()
     report_id = uuid4()
@@ -330,12 +345,14 @@ def test_get_report_rows_success(
         report_id,
         user_id=user_id,
         parse_status=ParseStatus.parsed,
+        payment_status=PaymentStatus.payed,
     )
     create_db_object(report)
     other_report = make_db_report(
         other_report_id,
         user_id=user_id,
         parse_status=ParseStatus.parsed,
+        payment_status=PaymentStatus.payed,
     )
     create_db_object(other_report)
     for i in range(1, n_rows + 1):
@@ -347,35 +364,50 @@ def test_get_report_rows_success(
 
     with client:
         resp = client.get(
-            GET_REPORT_ROWS_PATH.format(report_id=report_id),
+            path.format(report_id=report_id),
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
     assert resp.status_code == HTTPStatus.OK
     rows = resp.json()["rows"]
-    assert [r["name"] for r in rows] == [f"a{i}" for i in range(1, n_rows + 1)]
-    expected_keys = SimpleReportRow.schema()["properties"].keys()
+    expected_keys = model.schema()["properties"].keys()
     for row in rows:
         assert set(row.keys()) == set(expected_keys)
 
+    rng = range(1, n_rows + 1)
+    if model is SimpleReportRow:
+        assert [r["name"] for r in rows] == [f"a{i}" for i in rng]
+    else:
+        assert [r["name_full"] for r in rows] == [f"isin a{i}" for i in rng]
 
+
+@pytest.mark.parametrize(
+    "path",
+    (GET_REPORT_ROWS_PATH, GET_DETAILED_REPORT_ROWS_PATH),
+)
 @pytest.mark.parametrize("headers", ({}, {"Authorization": "Bearer token"}))
 def test_get_report_rows_forbidden_when_not_authenticated(
     client: TestClient,
     headers: tp.Dict[str, str],
+    path: str,
 ) -> None:
     with client:
         resp = client.get(
-            GET_REPORT_ROWS_PATH.format(report_id=uuid4()),
+            path.format(report_id=uuid4()),
             headers=headers,
         )
     assert_forbidden(resp)
 
 
+@pytest.mark.parametrize(
+    "path",
+    (GET_REPORT_ROWS_PATH, GET_DETAILED_REPORT_ROWS_PATH),
+)
 def test_get_report_rows_forbidden_when_foreign_report(
     client: TestClient,
     create_db_object: DBObjectCreator,
     fake_auth_server: FakeAuthServer,
+    path: str,
 ) -> None:
     user_id = uuid4()
     foreign_report_id = uuid4()
@@ -383,18 +415,23 @@ def test_get_report_rows_forbidden_when_foreign_report(
         foreign_report_id,
         user_id=uuid4(),
         parse_status=ParseStatus.parsed,
+        payment_status=PaymentStatus.payed,
     )
     create_db_object(foreign_report)
     access_token = "some_token"
     fake_auth_server.add_ok_response(access_token, user_id)
     with client:
         resp = client.get(
-            GET_REPORT_ROWS_PATH.format(report_id=foreign_report_id),
+            path.format(report_id=foreign_report_id),
             headers={"Authorization": f"Bearer {access_token}"},
         )
     assert_forbidden(resp, "forbidden")
 
 
+@pytest.mark.parametrize(
+    "path",
+    (GET_REPORT_ROWS_PATH, GET_DETAILED_REPORT_ROWS_PATH),
+)
 @pytest.mark.parametrize(
     "parse_status",
     (
@@ -407,6 +444,7 @@ def test_get_report_rows_when_not_parsed(
     create_db_object: DBObjectCreator,
     fake_auth_server: FakeAuthServer,
     parse_status: ParseStatus,
+    path: str,
 ) -> None:
     user_id = uuid4()
     report_id = uuid4()
@@ -414,21 +452,27 @@ def test_get_report_rows_when_not_parsed(
         report_id,
         user_id=user_id,
         parse_status=parse_status,
+        payment_status=PaymentStatus.payed,
     )
     create_db_object(report)
     access_token = "some_token"
     fake_auth_server.add_ok_response(access_token, user_id)
     with client:
         resp = client.get(
-            GET_REPORT_ROWS_PATH.format(report_id=report_id),
+            path.format(report_id=report_id),
             headers={"Authorization": f"Bearer {access_token}"},
         )
     assert resp.status_code == HTTPStatus.CONFLICT
 
 
+@pytest.mark.parametrize(
+    "path",
+    (GET_REPORT_ROWS_PATH, GET_DETAILED_REPORT_ROWS_PATH),
+)
 def test_get_report_rows_when_not_exist(
     client: TestClient,
     fake_auth_server: FakeAuthServer,
+    path: str,
 ) -> None:
     user_id = uuid4()
     report_id = uuid4()
@@ -436,16 +480,21 @@ def test_get_report_rows_when_not_exist(
     fake_auth_server.add_ok_response(access_token, user_id)
     with client:
         resp = client.get(
-            GET_REPORT_ROWS_PATH.format(report_id=report_id),
+            path.format(report_id=report_id),
             headers={"Authorization": f"Bearer {access_token}"},
         )
     assert resp.status_code == HTTPStatus.NOT_FOUND
 
 
+@pytest.mark.parametrize(
+    "path",
+    (GET_REPORT_ROWS_PATH, GET_DETAILED_REPORT_ROWS_PATH),
+)
 def test_get_report_rows_when_deleted(
     client: TestClient,
     fake_auth_server: FakeAuthServer,
     create_db_object: DBObjectCreator,
+    path: str,
 ) -> None:
     user_id = uuid4()
     report_id = uuid4()
@@ -454,7 +503,40 @@ def test_get_report_rows_when_deleted(
     create_db_object(make_db_report(report_id, user_id, is_deleted=True))
     with client:
         resp = client.get(
-            GET_REPORT_ROWS_PATH.format(report_id=report_id),
+            path.format(report_id=report_id),
             headers={"Authorization": f"Bearer {access_token}"},
         )
     assert resp.status_code == HTTPStatus.NOT_FOUND
+
+
+@pytest.mark.parametrize(
+    "payment_status",
+    (
+        PaymentStatus.in_progress,
+        PaymentStatus.not_payed,
+        PaymentStatus.error,
+    )
+)
+def test_get_report_detailed_rows_when_not_payed(
+    client: TestClient,
+    create_db_object: DBObjectCreator,
+    fake_auth_server: FakeAuthServer,
+    payment_status: PaymentStatus,
+) -> None:
+    user_id = uuid4()
+    report_id = uuid4()
+    report = make_db_report(
+        report_id,
+        user_id=user_id,
+        parse_status=ParseStatus.parsed,
+        payment_status=payment_status,
+    )
+    create_db_object(report)
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+    with client:
+        resp = client.get(
+            GET_DETAILED_REPORT_ROWS_PATH.format(report_id=report_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    assert resp.status_code == HTTPStatus.PAYMENT_REQUIRED
