@@ -1,3 +1,4 @@
+import typing as tp
 from http import HTTPStatus
 from uuid import UUID
 
@@ -9,6 +10,7 @@ from reports_service.api.auth import get_request_user
 from reports_service.api.exceptions import (
     ForbiddenException,
     NotFoundException,
+    TooLargeFileException,
 )
 from reports_service.log import app_logger
 from reports_service.models.report import Report, Reports
@@ -22,6 +24,28 @@ from reports_service.services import (
 router = APIRouter()
 
 
+async def safely_load_file_content(
+    file: UploadFile,
+    max_size: int,  # bytes
+    chunk_size: int = 1000,  # bytes
+) -> bytes:
+    chunks: tp.List[bytes] = []
+    total_size = 0
+
+    while True:
+        chunk = await file.read(chunk_size)
+        if len(chunk) == 0:
+            return b"".join(chunks)
+
+        if isinstance(chunk, str):
+            chunk = chunk.encode()
+
+        chunks.append(chunk)
+        total_size += len(chunk)
+        if total_size > max_size:
+            raise TooLargeFileException()
+
+
 @router.post(
     path="/reports",
     tags=["Report"],
@@ -29,6 +53,7 @@ router = APIRouter()
     response_model=Report,
     responses={
         403: responses.forbidden,
+        413: responses.too_large,
         422: responses.unprocessable_entity,
     }
 )
@@ -39,12 +64,15 @@ async def upload_report(
 ) -> Report:
     app_logger.info(f"User {user.user_id} uploaded report {file.filename}")
 
+    max_report_size = request.app.state.max_report_size
+    file_content = await safely_load_file_content(file, max_report_size)
+
     db_service = get_db_service(request.app)
     report = await db_service.add_new_report(user.user_id, file.filename)
     app_logger.info(f"Report {report.report_id} created in db")
 
     storage_service = get_storage_service(request.app)
-    key = await storage_service.save_report(report.report_id, file)
+    key = await storage_service.save_report(report.report_id, file_content)
     app_logger.info(f"Report {report.report_id} saved to storage")
 
     queue_service = get_queue_service(request.app)

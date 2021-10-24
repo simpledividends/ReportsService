@@ -59,3 +59,14 @@ class NotPayedException(AppException):
         error_loc: tp.Optional[tp.Sequence[str]] = None,
     ):
         super().__init__(status_code, error_key, error_message, error_loc)
+
+
+class TooLargeFileException(AppException):
+    def __init__(
+        self,
+        status_code: int = HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+        error_key: str = "file_too_large",
+        error_message: str = "File is too large",
+        error_loc: tp.Optional[tp.Sequence[str]] = None,
+    ):
+        super().__init__(status_code, error_key, error_message, error_loc)
