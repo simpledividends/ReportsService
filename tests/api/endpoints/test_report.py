@@ -32,6 +32,7 @@ GET_REPORT_PATH = "/reports/{report_id}"
 DELETE_REPORT_PATH = "/reports/{report_id}"
 
 
+@pytest.mark.parametrize("body", (b"short body", b"long body" * 10**4))
 def test_upload_report_success(
     client: TestClient,
     fake_auth_server: FakeAuthServer,
@@ -40,13 +41,13 @@ def test_upload_report_success(
     sqs_client: BaseClient,
     service_config: ServiceConfig,
     sqs_queue_url: str,
+    body: bytes,
 ) -> None:
     access_token = "some_token"
     user_id = uuid4()
     fake_auth_server.add_ok_response(access_token, user_id)
 
     now = utc_now()
-    body = b"some data"
     request_id = "some_request_id"
     with NamedTemporaryFile("w+b") as f:
         filename = os.path.basename(f.name)
@@ -130,6 +131,51 @@ def test_upload_report_success(
         "report_id": str(report.report_id),
         }
     assert msg_body_kwargs == expected_body_kwargs
+
+
+def test_upload_report_too_large(
+    client: TestClient,
+    fake_auth_server: FakeAuthServer,
+    db_session: orm.Session,
+    s3_client: BaseClient,
+    sqs_client: BaseClient,
+    service_config: ServiceConfig,
+    sqs_queue_url: str,
+) -> None:
+    access_token = "some_token"
+    user_id = uuid4()
+    fake_auth_server.add_ok_response(access_token, user_id)
+
+    body = b"a" * int(service_config.max_report_size * 1.1)
+    request_id = "some_request_id"
+    with NamedTemporaryFile("w+b") as f:
+        f.write(body)
+        f.seek(0)
+        with client:
+            resp = client.post(
+                UPLOAD_REPORT_PATH,
+                files={"file": f},
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    service_config.request_id_header: request_id,
+                }
+            )
+
+    assert resp.status_code == HTTPStatus.REQUEST_ENTITY_TOO_LARGE
+    assert_all_tables_are_empty(db_session)
+
+    bucket = service_config.storage_config.bucket
+    objects = s3_client.list_objects(Bucket=bucket)
+    assert "Contents" not in objects
+
+    messages = (
+        sqs_client.receive_message(
+            QueueUrl=sqs_queue_url,
+            MaxNumberOfMessages=10,
+        )
+        .get('Messages', [])
+    )
+    assert len(messages) == 0
 
 
 @pytest.mark.parametrize("headers", ({}, {"Authorization": "Bearer token"}))

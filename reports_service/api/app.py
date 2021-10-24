@@ -41,6 +41,7 @@ def create_app(config: ServiceConfig) -> FastAPI:
 
     app = FastAPI()
 
+    app.state.max_report_size = config.max_report_size
     app.state.auth_service = make_auth_service(config)
     app.state.queue_service = make_queue_service(config)
     app.state.storage_service = make_storage_service(config)

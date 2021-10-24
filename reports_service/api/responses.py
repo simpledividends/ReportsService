@@ -89,3 +89,21 @@ not_payed = {
         },
     },
 }
+
+too_large = {
+    "model": ErrorResponse,
+    "description": "Error: Report file is too large",
+    "content": {
+        "application/json": {
+            "example": ErrorResponse(
+                errors=[
+                    Error(
+                        error_key="file_too_large",
+                        error_message="File is too large",
+                        error_loc=None,
+                    ),
+                ],
+            ),
+        },
+    },
+}

@@ -1,8 +1,8 @@
+import io
 from uuid import UUID
 
 import aioboto3
 from aiobotocore.session import ClientCreatorContext
-from fastapi import UploadFile
 from pydantic.main import BaseModel
 
 
@@ -24,8 +24,9 @@ class StorageService(BaseModel):
             aws_secret_access_key=self.secret_access_key,
         )
 
-    async def save_report(self, report_id: UUID, file: UploadFile) -> str:
+    async def save_report(self, report_id: UUID, content: bytes) -> str:
         key = self.report_body_key_template.format(report_id=report_id)
         async with self._client() as client:
+            file = io.BytesIO(content)
             await client.upload_fileobj(file, self.bucket, key)
         return key
