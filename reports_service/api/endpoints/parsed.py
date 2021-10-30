@@ -24,7 +24,7 @@ from reports_service.models.report import (
 )
 from reports_service.models.user import User
 from reports_service.response import create_response
-from reports_service.services import get_db_service
+from reports_service.services import get_db_service, get_price_service
 
 router = APIRouter()
 
@@ -62,15 +62,24 @@ async def upload_parsing_result(
 
     if parsing_result.is_parsed and parsing_result.parsed_report is not None:
         parse_status = ParseStatus.parsed
+
         parsed_report = parsing_result.parsed_report
         rows = parsed_report.rows
         parsed_dict = parsed_report.dict()
         parsed_dict.pop("rows")
+
         if parsed_dict["period"][0].year == parsed_dict["period"][1].year:
             year = parsed_dict["period"][0].year
         else:
             year = None
-        info = ExtendedParsedReportInfo(year=year, **parsed_dict)
+            app_logger.warning(f"Period of report {report_id} lies in 2 years")
+
+        price_service = get_price_service(request.app)
+        price = price_service.calc(parsed_report, report.created_at)
+        if report.price is not None and report.price < price:
+            price = report.price
+
+        info = ExtendedParsedReportInfo(year=year, price=price, **parsed_dict)
         await asyncio.gather(
             db_service.update_parsed_report(report_id, parse_status, info),
             db_service.add_report_rows(report_id, rows)

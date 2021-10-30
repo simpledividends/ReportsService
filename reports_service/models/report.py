@@ -1,5 +1,6 @@
 import typing as tp
 from datetime import date, datetime
+from decimal import Decimal
 from enum import Enum
 from uuid import UUID
 
@@ -28,6 +29,7 @@ class BaseReportInfo(BaseModel):
     created_at: datetime
     payment_status: PaymentStatus
     parse_status: ParseStatus
+    price: tp.Optional[Decimal]
 
 
 class ParsedReportRow(BaseModel):
@@ -52,6 +54,7 @@ class ParsedReportInfo(BaseModel):
 
 class ExtendedParsedReportInfo(ParsedReportInfo):
     year: tp.Optional[int]
+    price: Decimal
 
 
 class ParsedReport(ParsedReportInfo):

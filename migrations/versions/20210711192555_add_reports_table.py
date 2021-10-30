@@ -11,6 +11,7 @@ from alembic import op
 from sqlalchemy.dialects.postgresql import (
     BOOLEAN,
     DATE,
+    NUMERIC,
     SMALLINT,
     TIMESTAMP,
     UUID,
@@ -43,6 +44,7 @@ def upgrade():
             nullable=False,
             server_default=PaymentStatus.not_payed,
         ),
+        sa.Column("price", NUMERIC(precision=7, scale=2), nullable=True),
         sa.Column("parsed_at", TIMESTAMP, nullable=True),
         sa.Column("broker", VARCHAR(64), nullable=True),
         sa.Column("period_start", DATE, nullable=True),

@@ -63,6 +63,7 @@ class DBService(BaseModel):
                 , created_at
                 , parse_status
                 , payment_status
+                , price
                 , parsed_at
                 , broker
                 , period_start
@@ -180,6 +181,7 @@ class DBService(BaseModel):
                 , year = $7::SMALLINT
                 , parse_note = $8::VARCHAR
                 , parser_version = $9::VARCHAR
+                , price = $10::NUMERIC
             WHERE report_id = $1::UUID and is_deleted is False
         """
         if report_info is not None:
@@ -190,9 +192,10 @@ class DBService(BaseModel):
                 report_info.year,
                 report_info.note,
                 report_info.version,
+                report_info.price,
             )
         else:
-            info_values = (None, None, None, None, None, None)
+            info_values = (None, None, None, None, None, None, None)
         await self.pool.execute(
             query,
             report_id,
