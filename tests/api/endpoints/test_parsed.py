@@ -1,5 +1,6 @@
 import typing as tp
 from datetime import date
+from decimal import Decimal
 from http import HTTPStatus
 from uuid import uuid4
 
@@ -121,6 +122,7 @@ def test_upload_parsed_report_success(
     assert report.year == year
     assert report.parse_status == ParseStatus.parsed
     assert report.parsed_at == ApproxDatetime(now)
+    assert report.price == Decimal('100')
 
     # Check rows
     rows = db_session.query(ReportRowsTable).all()
