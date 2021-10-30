@@ -31,6 +31,7 @@ class ReportsTable(Base):
         nullable=False,
         server_default=PaymentStatus.not_payed,
     )
+    price = Column("price", pg.NUMERIC(precision=7, scale=2), nullable=True)
     parse_status = Column(parse_status_enum, nullable=False)
     parsed_at = Column(pg.TIMESTAMP, nullable=True)
     broker = Column(pg.VARCHAR(64), nullable=True)
