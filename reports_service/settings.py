@@ -1,4 +1,8 @@
+import typing as tp
+from datetime import datetime
+
 from pydantic import BaseSettings, PostgresDsn, validator
+from pydantic.main import BaseModel
 
 
 class Config(BaseSettings):
@@ -78,6 +82,23 @@ class SQSConfig(Config):
         env_prefix = "SQS_"
 
 
+class PriceStrategy(BaseModel):
+    started_at: datetime
+    calculator: str
+    params: tp.Dict[str, tp.Any]
+
+
+class PriceConfig(Config):
+    # TODO: think about it
+    strategies: tp.List[PriceStrategy] = [  # ordered by date
+        PriceStrategy(
+            started_at=datetime(2021, 6, 30),
+            calculator="linear_with_min_threshold",
+            params={"min_threshold": 100, "row_price": 1},
+        ),
+    ]
+
+
 class ServiceConfig(Config):
     max_report_size: int = 5_000_000
     service_name: str = "reports_service"
@@ -88,6 +109,7 @@ class ServiceConfig(Config):
     db_config: DBConfig
     storage_config: S3Config
     queue_config: SQSConfig
+    price_config: PriceConfig
 
 
 def get_config() -> ServiceConfig:
@@ -97,4 +119,5 @@ def get_config() -> ServiceConfig:
         db_config=DBConfig(db_pool_config=DBPoolConfig()),
         storage_config=S3Config(),
         queue_config=SQSConfig(),
+        price_config=PriceConfig(),
     )

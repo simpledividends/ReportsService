@@ -1,11 +1,12 @@
 from asyncpg import create_pool
 from fastapi import FastAPI
 
-from reports_service.auth import AuthService
-from reports_service.db.service import DBService
-from reports_service.queue import QueueService
-from reports_service.settings import ServiceConfig
-from reports_service.storage import StorageService
+from .auth import AuthService
+from .db.service import DBService
+from .pricing import PriceService
+from .queue import QueueService
+from .settings import ServiceConfig
+from .storage import StorageService
 
 
 def get_auth_service(app: FastAPI) -> AuthService:
@@ -22,6 +23,10 @@ def get_queue_service(app: FastAPI) -> QueueService:
 
 def get_storage_service(app: FastAPI) -> StorageService:
     return app.state.storage_service
+
+
+def get_price_service(app: FastAPI) -> PriceService:
+    return app.state.price_service
 
 
 def make_auth_service(config: ServiceConfig) -> AuthService:
@@ -46,3 +51,7 @@ def make_queue_service(config: ServiceConfig) -> QueueService:
 
 def make_storage_service(config: ServiceConfig) -> StorageService:
     return StorageService(**config.storage_config.dict())
+
+
+def make_price_service(config: ServiceConfig) -> PriceService:
+    return PriceService(**config.price_config.dict())
