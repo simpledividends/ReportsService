@@ -52,6 +52,7 @@ def upgrade():
         sa.Column("year", SMALLINT, nullable=True),
         sa.Column("parse_note", VARCHAR(256), nullable=True),
         sa.Column("parser_version", VARCHAR(64), nullable=True),
+        sa.Column("payment_status_updated_at", TIMESTAMP, nullable=True),
         sa.Column("is_deleted", BOOLEAN, nullable=False, server_default="0"),
         sa.Column("deleted_at", TIMESTAMP, nullable=True),
 
