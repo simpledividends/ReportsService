@@ -1,5 +1,6 @@
 import typing as tp
 from datetime import date, datetime
+from decimal import Decimal
 from http import HTTPStatus
 from uuid import UUID, uuid4
 
@@ -19,6 +20,8 @@ from reports_service.models.report import (
 from reports_service.models.user import UserRole
 
 DBObjectCreator = tp.Callable[[Base], None]
+
+CONFIRMATION_URL = "https://confirm"
 
 
 class FakeAuthServer:
@@ -72,6 +75,43 @@ class FakeAuthServer:
             )
 
 
+class FakePaymentServer:
+
+    def __init__(self) -> None:
+        self.requests: tp.List[werkzeug.Request] = []
+
+    def handle_create_payment_request(
+        self,
+        request: werkzeug.Request,
+    ) -> werkzeug.Response:
+        self.requests.append(request)
+        order_id = str(uuid4()) + "aa"
+        request_body = request.json
+        body = {
+            "id": order_id,
+            "status": "pending",
+            "paid": False,
+            "amount": request_body["amount"],
+            "confirmation": {
+                "type": "redirect",
+                "return_url": "https://www.merchant-website.com/return_url",
+                "confirmation_url": CONFIRMATION_URL,
+            },
+            "created_at": "2021-10-11T10:51:18.139Z",
+            "description": "some desc",
+            "metadata": request_body["metadata"],
+            "payment_method": {
+                "type": "bank_card",
+                "id": order_id,
+            },
+        }
+        return werkzeug.Response(
+                orjson.dumps(body),
+                status=HTTPStatus.OK,
+                content_type="application/json"
+            )
+
+
 def assert_forbidden(resp: Response, error_key: str = "forbidden!") -> None:
     assert resp.status_code == HTTPStatus.FORBIDDEN
     assert resp.json()["errors"][0]["error_key"] == error_key
@@ -107,6 +147,7 @@ def make_db_report(
     created_at: datetime = datetime(2021, 10, 11),
     parse_status: ParseStatus = ParseStatus.in_progress,
     payment_status: PaymentStatus = PaymentStatus.not_payed,
+    price: tp.Optional[Decimal] = None,
     broker: tp.Optional[str] = None,
     year: tp.Optional[int] = None,
     is_deleted: bool = False,
@@ -119,6 +160,7 @@ def make_db_report(
         created_at=created_at,
         parse_status=parse_status,
         payment_status=payment_status,
+        price=price,
         broker=broker,
         year=year,
         is_deleted=is_deleted,

@@ -107,3 +107,32 @@ too_large = {
         },
     },
 }
+
+
+not_parsed_or_payed = {
+    "model": ErrorResponse,
+    "description": "Error: Report not found or payed",
+    "content": {
+        "application/json": {
+            "example": ErrorResponse(
+                errors=[
+                    Error(
+                        error_key="report_not_parsed",
+                        error_message="Report is not parsed (yet)",
+                        error_loc=None,
+                    ),
+                    Error(
+                        error_key="report_already_payed",
+                        error_message="Report already payed",
+                        error_loc=None,
+                    ),
+                    Error(
+                        error_key="report_payment_in_progress",
+                        error_message="Report payment in progress",
+                        error_loc=None,
+                    ),
+                ],
+            ),
+        },
+    },
+}

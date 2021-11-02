@@ -20,7 +20,12 @@ from starlette.testclient import TestClient
 from reports_service.api.app import create_app
 from reports_service.db.models import Base
 from reports_service.settings import ServiceConfig, get_config
-from tests.helpers import DBObjectCreator, FakeAuthServer, clear_bucket
+from tests.helpers import (
+    DBObjectCreator,
+    FakeAuthServer,
+    FakePaymentServer,
+    clear_bucket,
+)
 
 CURRENT_DIR = Path(__file__).parent
 ALEMBIC_INI_PATH = CURRENT_DIR.parent / "alembic.ini"
@@ -99,9 +104,39 @@ def get_user_url(
 
 
 @pytest.fixture
-def set_env(get_user_url: str) -> tp.Generator[None, None, None]:
+def fake_payment_server() -> FakePaymentServer:
+    return FakePaymentServer()
+
+
+@pytest.fixture
+def create_payment_url(
+    httpserver: HTTPServer,
+    fake_payment_server: FakePaymentServer,
+) -> str:
+    path = "/payment"
+    url = f"http://127.0.0.1:{httpserver.port}{path}"
+    (
+        httpserver
+        .expect_request(path, "POST")
+        .respond_with_handler(
+            func=fake_payment_server.handle_create_payment_request,
+        )
+    )
+    return url
+
+
+@pytest.fixture
+def set_env(
+    get_user_url: str,
+    create_payment_url: str,
+) -> tp.Generator[None, None, None]:
     monkeypatch = MonkeyPatch()
     monkeypatch.setenv("GET_USER_URL", get_user_url)
+    monkeypatch.setenv("CREATE_PAYMENT_URL", create_payment_url)
+    monkeypatch.setenv("PAYMENT_SHOP_ID", "my_shop")
+    monkeypatch.setenv("PAYMENT_SECRET_KEY", "super_secret")
+    monkeypatch.setenv("PAYMENT_RETURN_URL", "my_site")
+    monkeypatch.setenv("PRODUCT_CODE", "some_code")
 
     yield
 

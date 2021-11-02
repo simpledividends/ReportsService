@@ -40,6 +40,7 @@ class ReportsTable(Base):
     year = Column(pg.SMALLINT, nullable=True)
     parse_note = Column(pg.VARCHAR(256), nullable=True)
     parser_version = Column(pg.VARCHAR(64), nullable=True)
+    payment_status_updated_at = Column(pg.TIMESTAMP, nullable=True)
     is_deleted = Column(pg.BOOLEAN, nullable=False, server_default="0")
     deleted_at = Column(pg.TIMESTAMP, nullable=True)
 
