@@ -10,6 +10,7 @@ from reports_service.models.report import (
     ExtendedParsedReportInfo,
     ParseStatus,
     ParsedReportRow,
+    PaymentStatus,
     Report,
     SimpleReportRow,
 )
@@ -250,3 +251,22 @@ class DBService(BaseModel):
             WHERE report_id = $1::UUID and is_deleted is False
         """
         await self.pool.execute(query, report_id, utc_now())
+
+    async def update_payment_status(
+        self,
+        report_id: UUID,
+        payment_status: PaymentStatus,
+    ) -> None:
+        query = """
+            UPDATE reports
+            SET
+                payment_status = $2::payment_status_enum
+                , payment_status_updated_at = $3::TIMESTAMP
+            WHERE report_id = $1::UUID and is_deleted is False
+        """
+        await self.pool.execute(
+            query,
+            report_id,
+            payment_status,
+            utc_now(),
+        )
