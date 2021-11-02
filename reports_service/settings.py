@@ -99,8 +99,29 @@ class PriceConfig(Config):
     ]
 
 
+class PaymentConfig(Config):
+    create_payment_url: str
+    shop_id: str
+    secret_key: str
+    return_url: str
+    product_code: str  # TODO: think
+    vat_code: int = 4  # TODO: think
+    payment_subject: str = "service"  # TODO: think
+    payment_mode: str = "full_payment"  # TODO: think
+    aiohttp_pool_size: int = 10
+    aiohttp_session_timeout: float = 10
+
+    class Config:
+        case_sensitive = False
+        fields = {
+            "shop_id": {"env": ["payment_shop_id"]},
+            "secret_key": {"env": ["payment_secret_key"]},
+            "return_url": {"env": ["payment_return_url"]},
+        }
+
+
 class ServiceConfig(Config):
-    max_report_size: int = 5_000_000
+    max_report_size: int = 5_000_000  # bytes
     service_name: str = "reports_service"
     request_id_header: str = "X-Request-Id"
 
@@ -110,6 +131,7 @@ class ServiceConfig(Config):
     storage_config: S3Config
     queue_config: SQSConfig
     price_config: PriceConfig
+    payment_config: PaymentConfig
 
 
 def get_config() -> ServiceConfig:
@@ -120,4 +142,5 @@ def get_config() -> ServiceConfig:
         storage_config=S3Config(),
         queue_config=SQSConfig(),
         price_config=PriceConfig(),
+        payment_config=PaymentConfig(),
     )

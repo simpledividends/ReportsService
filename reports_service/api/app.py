@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from ..log import app_logger, setup_logging
 from ..services import (
     make_auth_service,
+    make_payment_service,
     make_price_service,
     make_queue_service,
     make_storage_service,
@@ -47,6 +48,7 @@ def create_app(config: ServiceConfig) -> FastAPI:
     app.state.queue_service = make_queue_service(config)
     app.state.storage_service = make_storage_service(config)
     app.state.price_service = make_price_service(config)
+    app.state.payment_service = make_payment_service(config)
 
     add_routes(app)
     add_middlewares(app, config.request_id_header)

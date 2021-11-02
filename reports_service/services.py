@@ -3,6 +3,7 @@ from fastapi import FastAPI
 
 from .auth import AuthService
 from .db.service import DBService
+from .payment import PaymentService
 from .pricing import PriceService
 from .queue import QueueService
 from .settings import ServiceConfig
@@ -27,6 +28,10 @@ def get_storage_service(app: FastAPI) -> StorageService:
 
 def get_price_service(app: FastAPI) -> PriceService:
     return app.state.price_service
+
+
+def get_payment_service(app: FastAPI) -> PaymentService:
+    return app.state.payment_service
 
 
 def make_auth_service(config: ServiceConfig) -> AuthService:
@@ -55,3 +60,7 @@ def make_storage_service(config: ServiceConfig) -> StorageService:
 
 def make_price_service(config: ServiceConfig) -> PriceService:
     return PriceService(**config.price_config.dict())
+
+
+def make_payment_service(config: ServiceConfig) -> PaymentService:
+    return PaymentService(**config.payment_config.dict())
