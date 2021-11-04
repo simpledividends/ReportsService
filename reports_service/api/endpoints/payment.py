@@ -1,8 +1,9 @@
 
+import typing as tp
 from http import HTTPStatus
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -16,7 +17,12 @@ from reports_service.api.exceptions import (
     NotParsedException,
 )
 from reports_service.log import app_logger
-from reports_service.models.payment import YookassaEvent, YookassaEventBody
+from reports_service.models.payment import (
+    Price,
+    PromocodeUsage,
+    YookassaEvent,
+    YookassaEventBody,
+)
 from reports_service.models.report import ParseStatus, PaymentStatus
 from reports_service.models.user import User
 from reports_service.response import create_response
@@ -25,6 +31,60 @@ from reports_service.services import get_db_service, get_payment_service
 router = APIRouter()
 
 USER_PAYMENT_CANCELLATION_REASONS = ("expired_on_confirmation",)
+
+
+@router.get(
+    path="/reports/{report_id}/price",
+    tags=["Payment"],
+    status_code=HTTPStatus.OK,
+    response_model=Price,
+    responses={
+        403: responses.forbidden,
+        404: responses.not_found,
+        409: responses.no_price,
+    }
+)
+async def get_report_price(
+    request: Request,
+    report_id: UUID,
+    promo: tp.Optional[str] = Query(None),
+    user: User = Depends(get_request_user)
+) -> Price:
+    app_logger.info(
+        f"User {user.user_id} requests price for report {report_id}"
+        f" with promocode {promo}"
+    )
+
+    db_service = get_db_service(request.app)
+    report = await db_service.get_report(report_id)
+    app_logger.info("Got report (or nothing) from db")
+
+    if report is None:
+        raise NotFoundException()
+    if report.user_id != user.user_id:
+        raise ForbiddenException()
+    if report.price is None:
+        raise AppException(
+            status_code=HTTPStatus.CONFLICT,
+            error_key="no_price",
+            error_message="Price not set for this report (yet)",
+        )
+
+    if promo is not None:
+        promo_code = promo.upper()
+        promocode = await db_service.get_promocode(promo_code)
+        payment_service = get_payment_service(request.app)
+        price = payment_service.get_price_with_promocode(report, promocode)
+    else:
+        price = Price(
+            start_price=report.price,
+            final_price=report.price,
+            discount=0,
+            promocode_usage=PromocodeUsage.not_set,
+        )
+    app_logger.info(f"Got price: {price}")
+
+    return price
 
 
 class CreatedPayment(BaseModel):
@@ -45,6 +105,7 @@ class CreatedPayment(BaseModel):
 async def create_payment(
     request: Request,
     report_id: UUID,
+    promo: tp.Optional[str] = Query(None),
     user: User = Depends(get_request_user)
 ) -> CreatedPayment:
     app_logger.info(f"User {user.user_id} pay for report {report_id}")
@@ -72,8 +133,18 @@ async def create_payment(
             error_message="Report payment in progress",
         )
 
+    if promo is not None:
+        promocode = await db_service.get_promocode(promo.upper())
+    else:
+        promocode = None
+
     payment_service = get_payment_service(request.app)
-    confirmation_url = await payment_service.create_payment(user, report)
+    confirmation_url, body = await payment_service.create_payment(
+        user,
+        report,
+        promocode,
+    )
+
     app_logger.info(f"Got confirmation_url: {confirmation_url}")
 
     await db_service.update_payment_status(
@@ -81,6 +152,12 @@ async def create_payment(
         PaymentStatus.in_progress,
     )
     app_logger.info("Updated payment status")
+
+    if body["metadata"]["promocode"] is not None:
+        await db_service.update_promocode_rest_usages(
+            body["metadata"]["promocode"],
+            -1
+        )
 
     return CreatedPayment(confirmation_url=confirmation_url)
 
@@ -117,12 +194,22 @@ async def accept_yookassa_webhook(
         raise ValueError(f"Unexpected webhook event {event}")
     app_logger.info(f"Chosen payment status: {payment_status}")
 
-    report_id = metadata["report_id"]
     db_service = get_db_service(request.app)
+    report_id = metadata["report_id"]
+
     report = await db_service.get_report(report_id)
     if report is None:
         raise ValueError(f"Report {report_id} not exists")
     await db_service.update_payment_status(report_id, payment_status)
     app_logger.info("Payment status updated")
+
+    if (
+        metadata.get("promocode") is not None
+        and payment_status == PaymentStatus.error
+    ):
+        await db_service.update_promocode_rest_usages(
+            metadata["promocode"],
+            +1
+        )
 
     return create_response(status_code=HTTPStatus.OK)

@@ -5,6 +5,7 @@ from asyncpg import Pool, Record
 from pydantic import BaseModel
 
 from reports_service.log import app_logger
+from reports_service.models.payment import Promocode
 from reports_service.models.report import (
     DetailedReportRow,
     ExtendedParsedReportInfo,
@@ -269,4 +270,33 @@ class DBService(BaseModel):
             report_id,
             payment_status,
             utc_now(),
+        )
+
+    async def get_promocode(
+        self,
+        promo_code: str,
+    ) -> Promocode:
+        query = """
+            SELECT *
+            FROM promocodes
+            WHERE promocode = $1::VARCHAR
+        """
+        record = await self.pool.fetchrow(query, promo_code)
+        return Promocode(**record) if record is not None else None
+
+    async def update_promocode_rest_usages(
+        self,
+        promo_code: str,
+        increment: int,
+    ) -> None:
+        query = """
+            UPDATE promocodes
+            SET
+                rest_usages = rest_usages + $2::INTEGER
+            WHERE promocode = $1::VARCHAR
+        """
+        await self.pool.execute(
+            query,
+            promo_code,
+            increment,
         )
