@@ -135,6 +135,7 @@ def set_env(
     monkeypatch.setenv("CREATE_PAYMENT_URL", create_payment_url)
     monkeypatch.setenv("PAYMENT_SHOP_ID", "my_shop")
     monkeypatch.setenv("PAYMENT_SECRET_KEY", "super_secret")
+    monkeypatch.setenv("PAYMENT_JWT_KEY", "secret_jwt_key")
     monkeypatch.setenv("PAYMENT_RETURN_URL", "my_site")
     monkeypatch.setenv("PRODUCT_CODE", "some_code")
 

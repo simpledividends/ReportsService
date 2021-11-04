@@ -33,3 +33,9 @@ class AnyUUID:
             return False
         uuid = UUID(actual)
         return uuid.version == self.version
+
+
+class AnyStr:
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, str)

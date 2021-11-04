@@ -4,6 +4,7 @@ from decimal import Decimal
 from http import HTTPStatus
 from uuid import UUID, uuid4
 
+import jwt
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import orm
@@ -20,9 +21,10 @@ from tests.helpers import (
     assert_forbidden,
     make_db_report,
 )
-from tests.utils import ApproxDatetime
+from tests.utils import AnyStr, AnyUUID, ApproxDatetime
 
 CREATE_PAYMENT_PATH = "/reports/{report_id}/payment"
+ACCEPT_YOOKASSA_WEBHOOK_PATH = "/yookassa/webhook"
 
 
 @pytest.mark.parametrize(
@@ -72,7 +74,7 @@ def test_create_payment_success(
     assert reports[0].payment_status == PaymentStatus.in_progress
     assert reports[0].payment_status_updated_at == ApproxDatetime(now)
 
-    # Check request to yoomoney
+    # Check request to yookassa
     assert len(fake_payment_server.requests) == 1
     payment_request = fake_payment_server.requests[0]
     payment_config = service_config.payment_config
@@ -116,8 +118,16 @@ def test_create_payment_success(
             "user_id": str(user_id),
             "report_id": str(report_id),
             "request_id": request_id,
+            "token": AnyStr(),
         },
     }
+    token = payment_request.json["metadata"]["token"]
+    decoded_token = jwt.decode(
+        token,
+        payment_config.jwt_key,
+        [payment_config.jwt_algorithm],
+    )
+    assert decoded_token == {"id": AnyUUID()}
 
 
 @pytest.mark.parametrize("headers", ({}, {"Authorization": "Bearer token"}))
@@ -273,3 +283,170 @@ def test_create_payment_price_is_null(
         )
 
     assert resp.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+@pytest.mark.parametrize(
+    "event,cancellation_reason,expected_payment_status",
+    (
+        ("payment.succeeded", None, PaymentStatus.payed),
+        (
+            "payment.canceled",
+            "expired_on_confirmation",
+            PaymentStatus.not_payed,
+        ),
+        ("payment.canceled", "card_expired", PaymentStatus.error),
+    ),
+)
+def test_accept_yookassa_webhook_success(
+    client: TestClient,
+    db_session: orm.Session,
+    service_config: ServiceConfig,
+    create_db_object: DBObjectCreator,
+    event: str,
+    cancellation_reason: tp.Optional[str],
+    expected_payment_status: PaymentStatus,
+) -> None:
+    report_id = uuid4()
+    create_db_object(make_db_report(report_id))
+    body = {
+        "type": "notification",
+        "event": event,
+        "object": {
+            "id": str(uuid4()),
+            "metadata": {
+                "report_id": str(report_id),
+                "token": jwt.encode(
+                    {},
+                    service_config.payment_config.jwt_key,
+                    service_config.payment_config.jwt_algorithm,
+                )
+            },
+            "cancellation_details": {
+                "reason": cancellation_reason,
+            }
+        }
+    }
+    with client:
+        resp = client.post(
+            ACCEPT_YOOKASSA_WEBHOOK_PATH,
+            json=body,
+        )
+
+    assert resp.status_code == HTTPStatus.OK
+
+    reports = db_session.query(ReportsTable).all()
+    assert len(reports) == 1
+    assert reports[0].payment_status == expected_payment_status
+
+
+def test_accept_yookassa_webhook_error_when_token_incorrect(
+    client: TestClient,
+    db_session: orm.Session,
+    service_config: ServiceConfig,
+    create_db_object: DBObjectCreator,
+) -> None:
+    report_id = uuid4()
+    create_db_object(make_db_report(report_id))
+    body = {
+        "type": "notification",
+        "event": "payment.succeeded",
+        "object": {
+            "id": str(uuid4()),
+            "metadata": {
+                "report_id": str(report_id),
+                "token": jwt.encode(
+                    {},
+                    service_config.payment_config.jwt_key + "a",
+                    service_config.payment_config.jwt_algorithm,
+                )
+            },
+        }
+    }
+    with client:
+        resp = client.post(
+            ACCEPT_YOOKASSA_WEBHOOK_PATH,
+            json=body,
+        )
+
+    assert resp.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+
+    reports = db_session.query(ReportsTable).all()
+    assert len(reports) == 1
+    assert reports[0].payment_status == PaymentStatus.not_payed
+
+
+@pytest.mark.parametrize(
+    "event",
+    ("payment.waiting_for_capture", "refund.succeeded"),
+)
+def test_accept_yookassa_webhook_error_when_unexpected_event(
+    client: TestClient,
+    db_session: orm.Session,
+    service_config: ServiceConfig,
+    create_db_object: DBObjectCreator,
+    event: str,
+) -> None:
+    report_id = uuid4()
+    create_db_object(make_db_report(report_id))
+    body = {
+        "type": "notification",
+        "event": event,
+        "object": {
+            "id": str(uuid4()),
+            "metadata": {
+                "report_id": str(report_id),
+                "token": jwt.encode(
+                    {},
+                    service_config.payment_config.jwt_key,
+                    service_config.payment_config.jwt_algorithm,
+                )
+            },
+        }
+    }
+    with client:
+        resp = client.post(
+            ACCEPT_YOOKASSA_WEBHOOK_PATH,
+            json=body,
+        )
+
+    assert resp.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+
+    reports = db_session.query(ReportsTable).all()
+    assert len(reports) == 1
+    assert reports[0].payment_status == PaymentStatus.not_payed
+
+
+def test_accept_yookassa_webhook_error_when_report_not_exist(
+    client: TestClient,
+    db_session: orm.Session,
+    service_config: ServiceConfig,
+    create_db_object: DBObjectCreator,
+) -> None:
+    report_id = uuid4()
+    create_db_object(make_db_report(uuid4()))  # other report
+    body = {
+        "type": "notification",
+        "event": "payment.succeeded",
+        "object": {
+            "id": str(uuid4()),
+            "metadata": {
+                "report_id": str(report_id),
+                "token": jwt.encode(
+                    {},
+                    service_config.payment_config.jwt_key,
+                    service_config.payment_config.jwt_algorithm,
+                )
+            },
+        }
+    }
+    with client:
+        resp = client.post(
+            ACCEPT_YOOKASSA_WEBHOOK_PATH,
+            json=body,
+        )
+
+    assert resp.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+
+    reports = db_session.query(ReportsTable).all()
+    assert len(reports) == 1
+    assert reports[0].payment_status == PaymentStatus.not_payed

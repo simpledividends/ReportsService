@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from reports_service.api import responses
 from reports_service.api.auth import get_request_user
@@ -15,11 +16,15 @@ from reports_service.api.exceptions import (
     NotParsedException,
 )
 from reports_service.log import app_logger
+from reports_service.models.payment import YookassaEvent, YookassaEventBody
 from reports_service.models.report import ParseStatus, PaymentStatus
 from reports_service.models.user import User
+from reports_service.response import create_response
 from reports_service.services import get_db_service, get_payment_service
 
 router = APIRouter()
+
+USER_PAYMENT_CANCELLATION_REASONS = ("expired_on_confirmation",)
 
 
 class CreatedPayment(BaseModel):
@@ -78,3 +83,46 @@ async def create_payment(
     app_logger.info("Updated payment status")
 
     return CreatedPayment(confirmation_url=confirmation_url)
+
+
+@router.post(
+    path="/yookassa/webhook",
+    tags=["Payment"],
+    status_code=HTTPStatus.OK,
+)
+async def accept_yookassa_webhook(
+    request: Request,
+    body: YookassaEventBody,
+) -> JSONResponse:
+    payment_service = get_payment_service(request.app)
+    payment_service.verify_authenticity_of_webhook(body)
+
+    event = body.event
+    metadata = body.object["metadata"]
+    metadata.pop("token")
+    app_logger.info(
+        f"Received {event} webhook. Yookassa payment id: {body.object['id']}."
+        f" Metadata: {metadata}."
+    )
+
+    if event == YookassaEvent.succeeded:
+        payment_status = PaymentStatus.payed
+    elif event == YookassaEvent.cancelled:
+        cancellation_details = body.object["cancellation_details"]
+        if cancellation_details["reason"] in USER_PAYMENT_CANCELLATION_REASONS:
+            payment_status = PaymentStatus.not_payed
+        else:
+            payment_status = PaymentStatus.error
+    else:
+        raise ValueError(f"Unexpected webhook event {event}")
+    app_logger.info(f"Chosen payment status: {payment_status}")
+
+    report_id = metadata["report_id"]
+    db_service = get_db_service(request.app)
+    report = await db_service.get_report(report_id)
+    if report is None:
+        raise ValueError(f"Report {report_id} not exists")
+    await db_service.update_payment_status(report_id, payment_status)
+    app_logger.info("Payment status updated")
+
+    return create_response(status_code=HTTPStatus.OK)
