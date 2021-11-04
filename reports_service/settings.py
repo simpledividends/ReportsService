@@ -104,12 +104,14 @@ class PaymentConfig(Config):
     shop_id: str
     secret_key: str
     return_url: str
+    jwt_key: str
     product_code: str  # TODO: think
     vat_code: int = 4  # TODO: think
     payment_subject: str = "service"  # TODO: think
     payment_mode: str = "full_payment"  # TODO: think
     aiohttp_pool_size: int = 10
     aiohttp_session_timeout: float = 10
+    jwt_algorithm: str = "HS256"
 
     class Config:
         case_sensitive = False
@@ -117,6 +119,12 @@ class PaymentConfig(Config):
             "shop_id": {"env": ["payment_shop_id"]},
             "secret_key": {"env": ["payment_secret_key"]},
             "return_url": {"env": ["payment_return_url"]},
+            "jwt_key": {"env": ["payment_jwt_key"]},
+            "aiohttp_pool_size": {"env": ["payment_aiohttp_pool_size"]},
+            "aiohttp_session_timeout": {
+                "env": ["payment_aiohttp_session_timeout"],
+            },
+            "jwt_algorithm": {"env": ["payment_jwt_algorithm"]},
         }
 
 

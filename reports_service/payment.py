@@ -1,13 +1,14 @@
-
 import typing as tp
 from http import HTTPStatus
 from socket import AF_INET
 from uuid import uuid4
 
 import aiohttp
+import jwt
 from pydantic import BaseModel
 
 from reports_service.context import REQUEST_ID
+from reports_service.models.payment import YookassaEventBody
 from reports_service.models.report import Report
 from reports_service.models.user import User
 
@@ -25,13 +26,15 @@ class PaymentService(BaseModel):
     create_payment_url: str
     shop_id: str
     secret_key: str
+    return_url: str
+    jwt_key: str
     vat_code: int
     payment_subject: str
     payment_mode: str
     product_code: str
-    return_url: str
     aiohttp_pool_size: int
     aiohttp_session_timeout: float
+    jwt_algorithm: str
     session: tp.Optional[aiohttp.ClientSession] = None
 
     class Config:
@@ -89,10 +92,12 @@ class PaymentService(BaseModel):
                 },
             ],
         }
+        token_body = {"id": str(uuid4())}
         metadata = {
             "user_id": str(user.user_id),
             "report_id": str(report.report_id),
             "request_id": REQUEST_ID.get(),
+            "token": jwt.encode(token_body, self.jwt_key, self.jwt_algorithm),
         }
         body = {
             "amount": amount,
@@ -146,3 +151,10 @@ class PaymentService(BaseModel):
                 )
 
             return confirm_url
+
+    def verify_authenticity_of_webhook(
+        self,
+        event_body: YookassaEventBody,
+    ) -> None:
+        token = event_body.object["metadata"]["token"]
+        jwt.decode(token, self.jwt_key, [self.jwt_algorithm])
