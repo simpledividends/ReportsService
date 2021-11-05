@@ -1,4 +1,5 @@
 import typing as tp
+from decimal import Decimal
 from http import HTTPStatus
 from socket import AF_INET
 from uuid import uuid4
@@ -7,12 +8,12 @@ import aiohttp
 import jwt
 from pydantic import BaseModel
 
-from reports_service.context import REQUEST_ID
-from reports_service.models.payment import YookassaEventBody
-from reports_service.models.report import Report
-from reports_service.models.user import User
-
+from .context import REQUEST_ID
 from .log import app_logger
+from .models.payment import Price, Promocode, PromocodeUsage, YookassaEventBody
+from .models.report import Report
+from .models.user import User
+from .utils import utc_now
 
 RUBLE_CURRENCY = "RUB"
 PENDING_STATUS = "pending"
@@ -68,12 +69,25 @@ class PaymentService(BaseModel):
         desc = f"Оплата отчета {report.broker} от {report.created_at}"
         return desc
 
-    def _make_body(self, user: User, report: Report) -> tp.Dict[str, tp.Any]:
+    def _make_body(
+        self,
+        user: User,
+        report: Report,
+        promocode: tp.Optional[Promocode],
+    ) -> tp.Dict[str, tp.Any]:
         if report.price is None:
             raise ValueError(f"Report {report.report_id} price is None")
 
+        price = self.get_price_with_promocode(report, promocode)
+        if (
+            promocode is not None
+            and price.promocode_usage == PromocodeUsage.success
+        ):
+            used_promocode = promocode.promocode
+        else:
+            used_promocode = None
         amount = {
-            "value": str(report.price),
+            "value": str(price.final_price),
             "currency": RUBLE_CURRENCY,
         }
         receipt = {  # TODO: understand and finalize
@@ -97,6 +111,7 @@ class PaymentService(BaseModel):
             "user_id": str(user.user_id),
             "report_id": str(report.report_id),
             "request_id": REQUEST_ID.get(),
+            "promocode": used_promocode,
             "token": jwt.encode(token_body, self.jwt_key, self.jwt_algorithm),
         }
         body = {
@@ -113,13 +128,18 @@ class PaymentService(BaseModel):
         }
         return body
 
-    async def create_payment(self, user: User, report: Report) -> str:
+    async def create_payment(
+        self,
+        user: User,
+        report: Report,
+        promocode: tp.Optional[Promocode],
+    ) -> tp.Tuple[str, tp.Dict[str, tp.Any]]:
         auth = aiohttp.BasicAuth(login=self.shop_id, password=self.secret_key)
         headers = {
             "Idempotence-Key": str(uuid4()),
             "Content-Type": "application/json",
         }
-        body = self._make_body(user, report)
+        body = self._make_body(user, report, promocode)
 
         async with self._get_session().post(
             url=self.create_payment_url,
@@ -150,7 +170,7 @@ class PaymentService(BaseModel):
                     f"No confirmation_url in API response body: {e!r}"
                 )
 
-            return confirm_url
+            return confirm_url, body
 
     def verify_authenticity_of_webhook(
         self,
@@ -158,3 +178,36 @@ class PaymentService(BaseModel):
     ) -> None:
         token = event_body.object["metadata"]["token"]
         jwt.decode(token, self.jwt_key, [self.jwt_algorithm])
+
+    def get_price_with_promocode(
+        self,
+        report: Report,
+        promocode: tp.Optional[Promocode],
+    ) -> Price:
+        discount = 0
+        now = utc_now()
+        if (
+            promocode is None
+            or promocode.rest_usages <= 0
+            or (
+                promocode.user_id is not None
+                and promocode.user_id != report.user_id
+            )
+        ):
+            promocode_usage = PromocodeUsage.not_exist
+        elif promocode.valid_from > now or promocode.valid_to < now:
+            promocode_usage = PromocodeUsage.expired
+        else:
+            discount = promocode.discount
+            promocode_usage = PromocodeUsage.success
+
+        final_price_float = float(report.price) * (1 - discount / 100)
+        final_price = Decimal(str(round(final_price_float, 2)))
+
+        price = Price(
+            start_price=report.price,
+            final_price=final_price,
+            discount=discount,
+            promocode_usage=promocode_usage,
+        )
+        return price

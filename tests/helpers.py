@@ -1,5 +1,5 @@
 import typing as tp
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
 from uuid import UUID, uuid4
@@ -11,13 +11,19 @@ from requests import Response
 from sqlalchemy import inspect, orm, text
 
 from reports_service.auth import AUTH_SERVISE_AUTHORIZATION_HEADER
-from reports_service.db.models import Base, ReportRowsTable, ReportsTable
+from reports_service.db.models import (
+    Base,
+    PromocodesTable,
+    ReportRowsTable,
+    ReportsTable,
+)
 from reports_service.models.report import (
     ParseStatus,
     ParsedReportRow,
     PaymentStatus,
 )
 from reports_service.models.user import UserRole
+from reports_service.utils import utc_now
 
 DBObjectCreator = tp.Callable[[Base], None]
 
@@ -187,6 +193,26 @@ def make_db_report_row(
         tax_payment_date=date(2020, 10, 16),
         payed_tax_amount=2.3,
         tax_payment_currency_rate=77.7,
+    )
+
+
+def make_promocode(
+    promo_code: str = "PROMO123",
+    user_id: tp.Optional[UUID] = None,
+    valid_from: tp.Optional[datetime] = None,
+    valid_to: tp.Optional[datetime] = None,
+    rest_usages: int = 1000,
+    discount: int = 10,
+) -> PromocodesTable:
+    before = utc_now() - timedelta(days=10)
+    after = utc_now() + timedelta(days=10)
+    return PromocodesTable(
+        promocode=promo_code,
+        user_id=str(user_id) if user_id is not None else None,
+        valid_from=valid_from if valid_from is not None else before,
+        valid_to=valid_to if valid_to is not None else after,
+        rest_usages=rest_usages,
+        discount=discount,
     )
 
 

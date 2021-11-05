@@ -136,3 +136,22 @@ not_parsed_or_payed = {
         },
     },
 }
+
+
+no_price = {
+    "model": ErrorResponse,
+    "description": "Error: Report does not have price",
+    "content": {
+        "application/json": {
+            "example": ErrorResponse(
+                errors=[
+                    Error(
+                        error_key="no_price",
+                        error_message="Price not set for this report (yet)",
+                        error_loc=None,
+                    ),
+                ],
+            ),
+        },
+    },
+}

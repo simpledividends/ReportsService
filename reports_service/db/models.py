@@ -66,3 +66,14 @@ class ReportRowsTable(Base):
     tax_payment_currency_rate = Column(pg.FLOAT, nullable=True)
 
     report = orm.relationship(ReportsTable)
+
+
+class PromocodesTable(Base):
+    __tablename__ = "promocodes"
+
+    promocode = Column(pg.VARCHAR(16), primary_key=True)
+    user_id = Column(pg.UUID, nullable=True)
+    valid_from = Column(pg.TIMESTAMP, nullable=False)
+    valid_to = Column(pg.TIMESTAMP, nullable=False)
+    rest_usages = Column(pg.INTEGER, nullable=False)
+    discount = Column(pg.INTEGER, nullable=False)
