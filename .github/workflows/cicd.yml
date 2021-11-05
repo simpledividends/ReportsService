@@ -14,6 +14,11 @@ env:
   SQS_REGION: ru-central1
   SQS_QUEUE: myqueue
   SQS_PARSE_TASK: parse_report
+  PAYMENT_SHOP_ID: my_shop
+  PAYMENT_SECRET_KEY: super_secret
+  PAYMENT_JWT_KEY: secret_jwt_key
+  PAYMENT_RETURN_URL: my_site
+  PRODUCT_CODE: some_code
 
 jobs:
   test:
