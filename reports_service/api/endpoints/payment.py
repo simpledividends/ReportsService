@@ -108,7 +108,10 @@ async def create_payment(
     promo: tp.Optional[str] = Query(None),
     user: User = Depends(get_request_user)
 ) -> CreatedPayment:
-    app_logger.info(f"User {user.user_id} pay for report {report_id}")
+    app_logger.info(
+        f"User {user.user_id} pay for report {report_id}"
+        f" with promocode {promo}"
+    )
 
     db_service = get_db_service(request.app)
     report = await db_service.get_report(report_id)
@@ -145,7 +148,12 @@ async def create_payment(
         promocode,
     )
 
-    app_logger.info(f"Got confirmation_url: {confirmation_url}")
+    metadata = body["metadata"]
+    metadata.pop("token")
+    app_logger.info(
+        f"Payment created. Confirmation_url: {confirmation_url}."
+        f" Metadata: {metadata}"
+    )
 
     await db_service.update_payment_status(
         report_id,
@@ -158,6 +166,7 @@ async def create_payment(
             body["metadata"]["promocode"],
             -1
         )
+        app_logger.info("Promocode rest usages decremented.")
 
     return CreatedPayment(confirmation_url=confirmation_url)
 
@@ -211,5 +220,6 @@ async def accept_yookassa_webhook(
             metadata["promocode"],
             +1
         )
+        app_logger.info("Promocode rest usages incremented.")
 
     return create_response(status_code=HTTPStatus.OK)
