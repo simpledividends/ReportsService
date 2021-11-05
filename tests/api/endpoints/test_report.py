@@ -1,8 +1,9 @@
 import base64
 import os.path
 import typing as tp
-from datetime import datetime
+from datetime import date, datetime
 from http import HTTPStatus
+from operator import itemgetter
 from tempfile import NamedTemporaryFile
 from uuid import uuid4
 
@@ -13,7 +14,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import orm
 
 from reports_service.db.models import ReportRowsTable, ReportsTable
-from reports_service.models.report import ParseStatus, PaymentStatus, Report
+from reports_service.models.report import (
+    DetailedReport,
+    ParseStatus,
+    PaymentStatus,
+)
 from reports_service.settings import ServiceConfig
 from reports_service.utils import utc_now
 from tests.helpers import (
@@ -203,15 +208,37 @@ def test_get_reports_success(
 ) -> None:
     user_1_id = uuid4()
     user_2_id = uuid4()
-    create_db_object(make_db_report(user_id=user_1_id, filename="report_1"))
-    create_db_object(make_db_report(user_id=user_2_id, filename="report_2"))
-    create_db_object(make_db_report(user_id=user_1_id, filename="report_3"))
+
+    # Report 1 has no rows
+    create_db_object(make_db_report(user_id=user_1_id, filename="rep_1"))
+
+    # Report 2 has rows in 1 year
+    report_2_id = uuid4()
+    create_db_object(make_db_report(report_2_id, user_1_id, filename="rep_2"))
+    for i in range(3):
+        row = make_db_report_row(report_2_id, i, income_date=date(2020, 11, 5))
+        create_db_object(row)
+
+    # Report 3 has rows in 2 years
+    report_3_id = uuid4()
+    create_db_object(make_db_report(report_3_id, user_1_id, filename="rep_3"))
+    for i in range(1, 4):
+        row = make_db_report_row(report_3_id, i, income_date=date(2020, 11, 5))
+        create_db_object(row)
+    for i in range(4, 6):
+        row = make_db_report_row(report_3_id, i, income_date=date(2021, 11, 5))
+        create_db_object(row)
+
+    # Report 4 is deleted (deleted reports don't have rows)
     deleted_report = make_db_report(
         user_id=user_1_id,
-        filename="report_4",
+        filename="rep_4",
         is_deleted=True,
     )
     create_db_object(deleted_report)
+
+    # Report 5 is foreign
+    create_db_object(make_db_report(user_id=user_2_id, filename="rep_5"))
 
     access_token = "some_token"
     fake_auth_server.add_ok_response(access_token, user_1_id)
@@ -223,11 +250,22 @@ def test_get_reports_success(
         )
 
     assert resp.status_code == HTTPStatus.OK
-    reports = resp.json()["reports"]
-    report_names = [r["filename"] for r in reports]
-    assert sorted(report_names) == ["report_1", "report_3"]
-    for report in reports:
-        assert set(report.keys()) == set(Report.schema()["properties"].keys())
+
+    sorted_reports = sorted(resp.json()["reports"], key=itemgetter("filename"))
+
+    report_names = [r["filename"] for r in sorted_reports]
+    assert report_names == ["rep_1", "rep_2", "rep_3"]
+
+    for report in sorted_reports:
+        expected_keys = DetailedReport.schema()["properties"].keys()
+        assert set(report.keys()) == set(expected_keys)
+
+    assert sorted_reports[0]["parts"] == []
+    assert sorted_reports[1]["parts"] == [{"year": 2020, "n_rows": 3}]
+    assert sorted_reports[2]["parts"] == [
+        {"year": 2020, "n_rows": 3},
+        {"year": 2021, "n_rows": 2}
+    ]
 
 
 def test_get_reports_when_no_user_reports(
@@ -267,15 +305,34 @@ def test_get_reports_forbidden(
     assert_forbidden(resp)
 
 
+@pytest.mark.parametrize(
+    "row_years,expected_parts",
+    (
+        ([], []),
+        ([2020, 2020], [{"year": 2020, "n_rows": 2}]),
+        (
+            [2020, 2021, 2020],
+            [{"year": 2020, "n_rows": 2}, {"year": 2021, "n_rows": 1}]
+        ),
+    )
+)
 def test_get_report_success(
     client: TestClient,
     create_db_object: DBObjectCreator,
     fake_auth_server: FakeAuthServer,
+    row_years: tp.List[int],
+    expected_parts: tp.List[tp.Dict[str, tp.Any]],
 ) -> None:
     user_1_id = uuid4()
     user_2_id = uuid4()
+
     report = make_db_report(user_id=user_1_id, filename="report_1")
     create_db_object(report)
+    for i, year in enumerate(row_years, 1):
+        dt = date(year, 11, 5)
+        row = make_db_report_row(report.report_id, i, income_date=dt)
+        create_db_object(row)
+
     create_db_object(make_db_report(user_id=user_2_id, filename="report_2"))
     create_db_object(make_db_report(user_id=user_1_id, filename="report_3"))
 
@@ -303,6 +360,7 @@ def test_get_report_success(
         "year": None,
         "parse_note": None,
         "parser_version": None,
+        "parts": expected_parts,
     }
 
 

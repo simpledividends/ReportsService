@@ -179,6 +179,7 @@ def make_db_report_row(
     row_n: int = 1,
     isin: str = "isin",
     name: str = "name",
+    income_date: date = date(2020, 10, 16),
 ) -> ReportRowsTable:
     return ReportRowsTable(
         report_id=str(report_id or uuid4()),
@@ -188,9 +189,9 @@ def make_db_report_row(
         tax_rate="13",
         country_code="840",
         income_amount=15.3,
-        income_date=date(2020, 10, 16),
+        income_date=income_date,
         income_currency_rate=77.7,
-        tax_payment_date=date(2020, 10, 16),
+        tax_payment_date=income_date,
         payed_tax_amount=2.3,
         tax_payment_currency_rate=77.7,
     )
