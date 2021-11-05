@@ -1,3 +1,4 @@
+import asyncio
 import typing as tp
 from uuid import UUID, uuid4
 
@@ -7,12 +8,14 @@ from pydantic import BaseModel
 from reports_service.log import app_logger
 from reports_service.models.payment import Promocode
 from reports_service.models.report import (
+    DetailedReport,
     DetailedReportRow,
     ExtendedParsedReportInfo,
     ParseStatus,
     ParsedReportRow,
     PaymentStatus,
     Report,
+    ReportPart,
     SimpleReportRow,
 )
 from reports_service.utils import utc_now
@@ -84,24 +87,59 @@ class DBService(BaseModel):
         )
         return Report(**convert_period(record))
 
-    async def get_report(self, report_id: UUID) -> Report:
+    async def get_report(self, report_id: UUID) -> tp.Optional[Report]:
         query = """
             SELECT *
             FROM reports
-            WHERE report_id = $1::UUID and is_deleted is False
+            WHERE report_id = $1::UUID AND is_deleted is False
         """
         record = await self.pool.fetchrow(query, report_id)
         res = Report(**convert_period(record)) if record is not None else None
         return res
 
-    async def get_reports(self, user_id: UUID) -> tp.List[Report]:
+    async def _get_report_parts(self, report_id: UUID) -> tp.List[ReportPart]:
+        query = """
+            SELECT date_part('year', income_date) AS year, count(*) AS n_rows
+            FROM report_rows
+            WHERE report_id = $1::UUID
+            GROUP BY date_part('year', income_date)
+        """
+        records = await self.pool.fetch(query, report_id)
+        return [ReportPart(**record) for record in records]
+
+    async def get_detailed_report(
+        self,
+        report_id: UUID,
+    ) -> tp.Optional[DetailedReport]:
+        report, parts = await asyncio.gather(
+            self.get_report(report_id),
+            self._get_report_parts(report_id),
+        )
+        if report is None:
+            return None
+        return DetailedReport(**report.dict(), parts=parts)
+
+    async def _get_reports(self, user_id: UUID) -> tp.List[Report]:
         query = """
             SELECT *
             FROM reports
-            WHERE user_id = $1::UUID and is_deleted is False
+            WHERE user_id = $1::UUID AND is_deleted is False
         """
         records = await self.pool.fetch(query, user_id)
         return [Report(**convert_period(record)) for record in records]
+
+    async def get_detailed_reports(
+        self,
+        user_id: UUID,
+    ) -> tp.List[DetailedReport]:
+        reports = await self._get_reports(user_id)
+        tasks = [self._get_report_parts(r.report_id) for r in reports]
+        all_reports_parts = await asyncio.gather(*tasks)
+        res = [
+            DetailedReport(**report.dict(), parts=parts)
+            for report, parts in zip(reports, all_reports_parts)
+        ]
+        return res
 
     async def delete_report_rows(self, report_id: UUID) -> None:
         query = """
@@ -184,7 +222,7 @@ class DBService(BaseModel):
                 , parse_note = $8::VARCHAR
                 , parser_version = $9::VARCHAR
                 , price = $10::NUMERIC
-            WHERE report_id = $1::UUID and is_deleted is False
+            WHERE report_id = $1::UUID AND is_deleted is False
         """
         if report_info is not None:
             info_values = (
@@ -209,20 +247,27 @@ class DBService(BaseModel):
     async def get_report_rows(
         self,
         report_id: UUID,
+        year: tp.Optional[int],
     ) -> tp.List[SimpleReportRow]:
         query = """
             SELECT row_n, name, income_amount, income_date, payed_tax_amount
             FROM report_rows rr
                 JOIN reports r on r.report_id = rr.report_id
-            WHERE rr.report_id = $1::UUID and r.is_deleted is False
+            WHERE rr.report_id = $1::UUID
+                AND r.is_deleted is False
+                AND (
+                    date_part('year', income_date) = $2::INTEGER
+                    OR $2::INTEGER IS NULL
+                )
             ORDER BY row_n
         """
-        records = await self.pool.fetch(query, report_id)
+        records = await self.pool.fetch(query, report_id, year)
         return [SimpleReportRow(**record) for record in records]
 
     async def get_report_detailed_rows(
         self,
         report_id: UUID,
+        year: tp.Optional[int],
     ) -> tp.List[DetailedReportRow]:
         query = """
             SELECT
@@ -237,10 +282,15 @@ class DBService(BaseModel):
                 , tax_payment_currency_rate
             FROM report_rows rr
                 JOIN reports r on r.report_id = rr.report_id
-            WHERE rr.report_id = $1::UUID and r.is_deleted is False
+            WHERE rr.report_id = $1::UUID
+                AND r.is_deleted is False
+                AND (
+                    date_part('year', income_date) = $2::INTEGER
+                    OR $2::INTEGER IS NULL
+                )
             ORDER BY row_n
         """
-        records = await self.pool.fetch(query, report_id)
+        records = await self.pool.fetch(query, report_id, year)
         return [DetailedReportRow(**record) for record in records]
 
     async def set_report_deleted(self, report_id: UUID) -> None:
@@ -249,7 +299,7 @@ class DBService(BaseModel):
             SET
                 is_deleted = True
                 , deleted_at = $2::TIMESTAMP
-            WHERE report_id = $1::UUID and is_deleted is False
+            WHERE report_id = $1::UUID AND is_deleted is False
         """
         await self.pool.execute(query, report_id, utc_now())
 
@@ -263,7 +313,7 @@ class DBService(BaseModel):
             SET
                 payment_status = $2::payment_status_enum
                 , payment_status_updated_at = $3::TIMESTAMP
-            WHERE report_id = $1::UUID and is_deleted is False
+            WHERE report_id = $1::UUID AND is_deleted is False
         """
         await self.pool.execute(
             query,

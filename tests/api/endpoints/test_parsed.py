@@ -332,13 +332,15 @@ def test_upload_report_forbidden_whet_not_service_role(
     )
 )
 @pytest.mark.parametrize("n_rows", (3, 0))
+@pytest.mark.parametrize("year", (2022, None))
 def test_get_report_rows_success(
     client: TestClient,
     create_db_object: DBObjectCreator,
     fake_auth_server: FakeAuthServer,
-    n_rows: int,
     path: str,
     model: tp.Type,
+    n_rows: int,
+    year: tp.Optional[int],
 ) -> None:
     user_id = uuid4()
     report_id = uuid4()
@@ -358,7 +360,9 @@ def test_get_report_rows_success(
     )
     create_db_object(other_report)
     for i in range(1, n_rows + 1):
-        create_db_object(make_db_report_row(report_id, row_n=i, name=f"a{i}"))
+        dt = date(2020 + i, 11, 5)
+        row = make_db_report_row(report_id, i, name=f"a{i}", income_date=dt)
+        create_db_object(row)
     create_db_object(make_db_report_row(other_report_id, row_n=1))
 
     access_token = "some_token"
@@ -367,6 +371,7 @@ def test_get_report_rows_success(
     with client:
         resp = client.get(
             path.format(report_id=report_id),
+            params={"year": year} if year is not None else {},
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
@@ -376,11 +381,23 @@ def test_get_report_rows_success(
     for row in rows:
         assert set(row.keys()) == set(expected_keys)
 
-    rng = range(1, n_rows + 1)
-    if model is SimpleReportRow:
-        assert [r["name"] for r in rows] == [f"a{i}" for i in rng]
+    name_key, name = (
+        ("name", "a{i}")
+        if model is SimpleReportRow
+        else ("name_full", "isin a{i}")
+    )
+    if year is None:
+        rng = range(1, n_rows + 1)
+        assert [r[name_key] for r in rows] == [name.format(i=i) for i in rng]
+        expected_years = ["2021", "2022", "2023"][:n_rows]
+        assert [r["income_date"][:4] for r in rows] == expected_years
     else:
-        assert [r["name_full"] for r in rows] == [f"isin a{i}" for i in rng]
+        if n_rows == 0:
+            assert len(rows) == 0
+        else:
+            assert len(rows) == 1
+            assert rows[0][name_key] == name.format(i=year - 2020)
+            assert rows[0]["income_date"][:4] == str(year)
 
 
 @pytest.mark.parametrize(

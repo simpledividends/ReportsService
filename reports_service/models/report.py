@@ -76,8 +76,17 @@ class Report(BaseReportInfo):
     parser_version: tp.Optional[str]
 
 
-class Reports(BaseModel):
-    reports: tp.List[Report]
+class ReportPart(BaseModel):
+    year: int
+    n_rows: int
+
+
+class DetailedReport(Report):
+    parts: tp.List[ReportPart]
+
+
+class DetailedReports(BaseModel):
+    reports: tp.List[DetailedReport]
 
 
 class SimpleReportRow(BaseModel):

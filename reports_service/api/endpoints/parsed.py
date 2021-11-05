@@ -1,8 +1,10 @@
 import asyncio
+import typing as tp
 from http import HTTPStatus
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.param_functions import Query
 from starlette.responses import JSONResponse
 
 from reports_service.api import responses
@@ -72,7 +74,9 @@ async def upload_parsing_result(
             year = parsed_dict["period"][0].year
         else:
             year = None
-            app_logger.warning(f"Period of report {report_id} lies in 2 years")
+            app_logger.warning(
+                f"Period of report {report_id} lies more than in 1 year"
+            )
 
         price_service = get_price_service(request.app)
         price = price_service.calc(parsed_report, report.created_at)
@@ -110,6 +114,7 @@ async def upload_parsing_result(
 async def get_report_rows(
     request: Request,
     report_id: UUID,
+    year: tp.Optional[int] = Query(None),
     user: User = Depends(get_request_user)
 ) -> SimpleReportRows:
     app_logger.info(f"User {user.user_id} requested report {report_id} rows")
@@ -124,7 +129,7 @@ async def get_report_rows(
     if report.parse_status != ParseStatus.parsed:
         raise NotParsedException()
 
-    rows = await db_service.get_report_rows(report_id)
+    rows = await db_service.get_report_rows(report_id, year)
     return SimpleReportRows(rows=rows)
 
 
@@ -143,6 +148,7 @@ async def get_report_rows(
 async def get_report_detailed_rows(
     request: Request,
     report_id: UUID,
+    year: tp.Optional[int] = Query(None),
     user: User = Depends(get_request_user)
 ) -> DetailedReportRows:
     app_logger.info(f"User {user.user_id} requested report {report_id} rows")
@@ -159,5 +165,5 @@ async def get_report_detailed_rows(
     if report.payment_status != PaymentStatus.payed:
         raise NotPayedException()
 
-    rows = await db_service.get_report_detailed_rows(report_id)
+    rows = await db_service.get_report_detailed_rows(report_id, year)
     return DetailedReportRows(rows=rows)
