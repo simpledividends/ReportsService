@@ -41,7 +41,7 @@ def create_app(config: ServiceConfig) -> FastAPI:
     setup_logging(config)
     setup_asyncio(thread_name_prefix=config.service_name)
 
-    app = FastAPI()
+    app = FastAPI(debug=False)
 
     app.state.max_report_size = config.max_report_size
     app.state.auth_service = make_auth_service(config)
