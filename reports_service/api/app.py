@@ -18,6 +18,7 @@ from .endpoints import add_routes
 from .events import add_events
 from .exception_handlers import add_exception_handlers
 from .middlewares import add_middlewares
+from .config import AppConfig, set_app_config
 
 __all__ = ("create_app",)
 
@@ -43,7 +44,12 @@ def create_app(config: ServiceConfig) -> FastAPI:
 
     app = FastAPI(debug=False)
 
-    app.state.max_report_size = config.max_report_size
+    app_config = AppConfig(
+        max_report_size=config.max_report_size,
+        max_user_reports=config.max_user_reports,
+    )
+    set_app_config(app, app_config)
+
     app.state.auth_service = make_auth_service(config)
     app.state.queue_service = make_queue_service(config)
     app.state.storage_service = make_storage_service(config)

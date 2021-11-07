@@ -11,6 +11,7 @@ from reports_service.api.exceptions import (
     ForbiddenException,
     NotFoundException,
     TooLargeFileException,
+    AppException
 )
 from reports_service.log import app_logger
 from reports_service.models.report import (
@@ -24,6 +25,8 @@ from reports_service.services import (
     get_queue_service,
     get_storage_service,
 )
+from ..config import get_app_config
+
 
 router = APIRouter()
 
@@ -57,6 +60,7 @@ async def safely_load_file_content(
     response_model=Report,
     responses={
         403: responses.forbidden,
+        409: responses.too_many_reports,
         413: responses.too_large,
         422: responses.unprocessable_entity,
     }
@@ -68,8 +72,19 @@ async def upload_report(
 ) -> Report:
     app_logger.info(f"User {user.user_id} uploaded report {file.filename}")
 
-    max_report_size = request.app.state.max_report_size
+    db_service = get_db_service(request.app)
+    reports = await db_service.get_reports(user.user_id)
+    app_logger.info(f"User {user.user_id} has {len(reports)} reports")
+    if len(reports) >= get_app_config(request.app).max_user_reports:
+        raise AppException(
+            status_code=HTTPStatus.CONFLICT,
+            error_key="too_many_reports",
+            error_message="User has too many reports",
+        )
+
+    max_report_size = get_app_config(request.app).max_report_size
     file_content = await safely_load_file_content(file, max_report_size)
+    app_logger.info(f"File content loaded. Size: {len(file_content)}")
 
     db_service = get_db_service(request.app)
     report = await db_service.add_new_report(user.user_id, file.filename)

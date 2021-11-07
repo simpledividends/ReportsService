@@ -201,6 +201,38 @@ def test_upload_report_forbidden(
     assert_forbidden(resp)
 
 
+def test_upload_report_when_already_too_many_reports_per_user(
+    client: TestClient,
+    fake_auth_server: FakeAuthServer,
+    service_config: ServiceConfig,
+    create_db_object: DBObjectCreator,
+    db_session: orm.Session,
+) -> None:
+    user_id = uuid4()
+
+    for _ in range(service_config.max_user_reports):
+        create_db_object(make_db_report(user_id=user_id))
+
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+
+    with NamedTemporaryFile("w+b") as f:
+        f.write(b"some body")
+        f.seek(0)
+        with client:
+            resp = client.post(
+                UPLOAD_REPORT_PATH,
+                files={"file": f},
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+
+    assert resp.status_code == HTTPStatus.CONFLICT
+    assert resp.json()["errors"][0]["error_key"] == "too_many_reports"
+
+    reports = db_session.query(ReportsTable).all()
+    assert len(reports) == service_config.max_user_reports
+
+
 def test_get_reports_success(
     client: TestClient,
     create_db_object: DBObjectCreator,
