@@ -119,7 +119,7 @@ class DBService(BaseModel):
             return None
         return DetailedReport(**report.dict(), parts=parts)
 
-    async def _get_reports(self, user_id: UUID) -> tp.List[Report]:
+    async def get_reports(self, user_id: UUID) -> tp.List[Report]:
         query = """
             SELECT *
             FROM reports
@@ -132,7 +132,7 @@ class DBService(BaseModel):
         self,
         user_id: UUID,
     ) -> tp.List[DetailedReport]:
-        reports = await self._get_reports(user_id)
+        reports = await self.get_reports(user_id)
         tasks = [self._get_report_parts(r.report_id) for r in reports]
         all_reports_parts = await asyncio.gather(*tasks)
         res = [

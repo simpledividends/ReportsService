@@ -14,6 +14,7 @@ from ..services import (
     make_storage_service,
 )
 from ..settings import ServiceConfig
+from .config import AppConfig, set_app_config
 from .endpoints import add_routes
 from .events import add_events
 from .exception_handlers import add_exception_handlers
@@ -41,9 +42,15 @@ def create_app(config: ServiceConfig) -> FastAPI:
     setup_logging(config)
     setup_asyncio(thread_name_prefix=config.service_name)
 
-    app = FastAPI()
+    app = FastAPI(debug=False)
 
-    app.state.max_report_size = config.max_report_size
+    app_config = AppConfig(
+        max_report_size=config.max_report_size,
+        max_user_reports=config.max_user_reports,
+        max_report_filename_length=config.max_report_filename_length,
+    )
+    set_app_config(app, app_config)
+
     app.state.auth_service = make_auth_service(config)
     app.state.queue_service = make_queue_service(config)
     app.state.storage_service = make_storage_service(config)

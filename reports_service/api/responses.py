@@ -155,3 +155,22 @@ no_price = {
         },
     },
 }
+
+
+too_many_reports = {
+    "model": ErrorResponse,
+    "description": "Error: User has too many reports",
+    "content": {
+        "application/json": {
+            "example": ErrorResponse(
+                errors=[
+                    Error(
+                        error_key="too_many_reports",
+                        error_message="User has too many reports",
+                        error_loc=None,
+                    ),
+                ],
+            ),
+        },
+    },
+}

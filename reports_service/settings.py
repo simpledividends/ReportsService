@@ -130,6 +130,8 @@ class PaymentConfig(Config):
 
 class ServiceConfig(Config):
     max_report_size: int = 5_000_000  # bytes
+    max_user_reports: int = 100
+    max_report_filename_length: int = 128
     service_name: str = "reports_service"
     request_id_header: str = "X-Request-Id"
 
