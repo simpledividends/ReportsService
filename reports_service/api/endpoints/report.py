@@ -8,10 +8,10 @@ from starlette.requests import Request
 from reports_service.api import responses
 from reports_service.api.auth import get_request_user
 from reports_service.api.exceptions import (
+    AppException,
     ForbiddenException,
     NotFoundException,
     TooLargeFileException,
-    AppException
 )
 from reports_service.log import app_logger
 from reports_service.models.report import (
@@ -25,8 +25,8 @@ from reports_service.services import (
     get_queue_service,
     get_storage_service,
 )
-from ..config import get_app_config
 
+from ..config import get_app_config
 
 router = APIRouter()
 
@@ -71,18 +71,27 @@ async def upload_report(
     user: User = Depends(get_request_user)
 ) -> Report:
     app_logger.info(f"User {user.user_id} uploaded report {file.filename}")
+    app_config = get_app_config(request.app)
+
+    if len(file.filename) > app_config.max_report_filename_length:
+        raise AppException(
+            status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+            error_key="value_error.max_length",
+            error_loc=["file", "filename"],
+            error_message="Length of filename is too big.",
+        )
 
     db_service = get_db_service(request.app)
     reports = await db_service.get_reports(user.user_id)
     app_logger.info(f"User {user.user_id} has {len(reports)} reports")
-    if len(reports) >= get_app_config(request.app).max_user_reports:
+    if len(reports) >= app_config.max_user_reports:
         raise AppException(
             status_code=HTTPStatus.CONFLICT,
             error_key="too_many_reports",
             error_message="User has too many reports",
         )
 
-    max_report_size = get_app_config(request.app).max_report_size
+    max_report_size = app_config.max_report_size
     file_content = await safely_load_file_content(file, max_report_size)
     app_logger.info(f"File content loaded. Size: {len(file_content)}")
 

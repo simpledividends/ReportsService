@@ -233,6 +233,28 @@ def test_upload_report_when_already_too_many_reports_per_user(
     assert len(reports) == service_config.max_user_reports
 
 
+def test_upload_report_with_too_big_filename_length(
+    client: TestClient,
+    fake_auth_server: FakeAuthServer,
+) -> None:
+    user_id = uuid4()
+    access_token = "some_token"
+    fake_auth_server.add_ok_response(access_token, user_id)
+
+    with NamedTemporaryFile("w+b", suffix="s"*129) as f:
+        f.write(b"some body")
+        f.seek(0)
+        with client:
+            resp = client.post(
+                UPLOAD_REPORT_PATH,
+                files={"file": f},
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+
+    assert resp.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert resp.json()["errors"][0]["error_key"] == "value_error.max_length"
+
+
 def test_get_reports_success(
     client: TestClient,
     create_db_object: DBObjectCreator,

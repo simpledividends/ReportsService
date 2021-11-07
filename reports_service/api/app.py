@@ -14,11 +14,11 @@ from ..services import (
     make_storage_service,
 )
 from ..settings import ServiceConfig
+from .config import AppConfig, set_app_config
 from .endpoints import add_routes
 from .events import add_events
 from .exception_handlers import add_exception_handlers
 from .middlewares import add_middlewares
-from .config import AppConfig, set_app_config
 
 __all__ = ("create_app",)
 
@@ -47,6 +47,7 @@ def create_app(config: ServiceConfig) -> FastAPI:
     app_config = AppConfig(
         max_report_size=config.max_report_size,
         max_user_reports=config.max_user_reports,
+        max_report_filename_length=config.max_report_filename_length,
     )
     set_app_config(app, app_config)
 
