@@ -18,7 +18,7 @@ class QueueService(BaseModel):
     access_key_id: str
     secret_access_key: str
     region: str
-    queue: str
+    queue_path: str
     parse_task: str
 
     def _client(self) -> ClientCreatorContext:
@@ -63,7 +63,7 @@ class QueueService(BaseModel):
 
     @property
     def queue_url(self) -> str:
-        return urljoin(self.endpoint_url, f"queue/{self.queue}")
+        return urljoin(self.endpoint_url, self.queue_path)
 
     async def send_parse_message(self, report_id: uuid.UUID, key: str) -> None:
         msg = self._make_message(str(report_id), key)

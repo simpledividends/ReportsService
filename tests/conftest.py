@@ -187,8 +187,8 @@ def sqs_client(service_config: ServiceConfig) -> BaseClient:
 @pytest.fixture
 def sqs_queue_url(service_config: ServiceConfig) -> str:
     endpoint_url = service_config.queue_config.endpoint_url
-    queue_name = service_config.queue_config.queue
-    queue_url = urljoin(endpoint_url, f"queue/{queue_name}")
+    queue_path = service_config.queue_config.queue_path
+    queue_url = urljoin(endpoint_url, queue_path)
     return queue_url
 
 

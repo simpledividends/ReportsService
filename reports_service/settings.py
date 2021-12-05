@@ -74,7 +74,7 @@ class SQSConfig(Config):
     access_key_id: str
     secret_access_key: str
     region: str
-    queue: str
+    queue_path: str
     parse_task: str
 
     class Config:
