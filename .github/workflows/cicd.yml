@@ -7,73 +7,74 @@ env:
 
 
 jobs:
-#   run_tests:
-#     runs-on: ubuntu-20.04
-#     env:
-#       DB_URL: postgresql://user:pass@127.0.0.1:5432/db
-#       S3_ENDPOINT_URL: http://127.0.0.1:9000
-#       S3_ACCESS_KEY_ID: access_key_id
-#       S3_SECRET_ACCESS_KEY: secret_access_key
-#       S3_REGION: ru-central1
-#       S3_BUCKET: mybucket
-#       SQS_ENDPOINT_URL: http://localhost:9324
-#       SQS_ACCESS_KEY_ID: access_key_id
-#       SQS_SECRET_ACCESS_KEY: secret_access_key
-#       SQS_REGION: ru-central1
-#       SQS_QUEUE_PATH: queue/myqueue
-#       SQS_PARSE_TASK: parse_report
-#       PAYMENT_SHOP_ID: my_shop
-#       PAYMENT_SECRET_KEY: super_secret
-#       PAYMENT_JWT_KEY: secret_jwt_key
-#       PAYMENT_RETURN_URL: my_site
-#       PRODUCT_CODE: some_code
-  #   services:
+  run_tests:
+    runs-on: ubuntu-20.04
+    env:
+      DB_URL: postgresql://user:pass@127.0.0.1:5432/db
+      S3_ENDPOINT_URL: http://127.0.0.1:9000
+      S3_ACCESS_KEY_ID: access_key_id
+      S3_SECRET_ACCESS_KEY: secret_access_key
+      S3_REGION: ru-central1
+      S3_BUCKET: mybucket
+      SQS_ENDPOINT_URL: http://localhost:9324
+      SQS_ACCESS_KEY_ID: access_key_id
+      SQS_SECRET_ACCESS_KEY: secret_access_key
+      SQS_REGION: ru-central1
+      SQS_QUEUE_PATH: queue/myqueue
+      SQS_PARSE_TASK: parse_report
+      PAYMENT_SHOP_ID: my_shop
+      PAYMENT_SECRET_KEY: super_secret
+      PAYMENT_JWT_KEY: secret_jwt_key
+      PAYMENT_RETURN_URL: my_site
+      PRODUCT_CODE: some_code
+      
+    services:
 
-  #     postgres:
-  #       image: postgres:latest
-  #       env:
-  #         POSTGRES_DB: db
-  #         POSTGRES_USER: user
-  #         POSTGRES_PASSWORD: pass
-  #       ports:
-  #         - 5432:5432
-  #       # Set health checks to wait until postgres has started
-  #       options: >-
-  #         --health-cmd pg_isready
-  #         --health-interval 2s
-  #         --health-timeout 1s
-  #         --health-retries 10
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_DB: db
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: pass
+        ports:
+          - 5432:5432
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 1s
+          --health-retries 10
 
-  #     s3:
-  #       image: minio/minio:edge-cicd
-  #       ports:
-  #         - 9000:9000
-  #       env:
-  #         MINIO_ACCESS_KEY: access_key_id
-  #         MINIO_SECRET_KEY: secret_access_key
+      s3:
+        image: minio/minio:edge-cicd
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ACCESS_KEY: access_key_id
+          MINIO_SECRET_KEY: secret_access_key
 
-  #     sqs:
-  #       image: vsouza/sqs-local:latest
-  #       ports:
-  #         - "9324:9324"
+      sqs:
+        image: vsouza/sqs-local:latest
+        ports:
+          - "9324:9324"
 
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - name: "Setup python"
-  #       uses: actions/setup-python@v2
-  #       with:
-  #         python-version: "3.8"
-  #     - run: pip install poetry
-  #     - run: make install
-  #     - run: make lint
-  #     - run: make test
-  #     - run: make cov
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Setup python"
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.8"
+      - run: pip install poetry
+      - run: make install
+      - run: make lint
+      - run: make test
+      - run: make cov
 
 
 # -------------- TEST ENV --------------------- #
 
   test_build:
-    # needs: run_tests
+    needs: run_tests
     runs-on: ubuntu-20.04
     if: github.ref == 'refs/heads/develop'
 
