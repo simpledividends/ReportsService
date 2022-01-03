@@ -14,6 +14,15 @@ from reports_service.log import access_logger, app_logger
 from reports_service.models.common import Error
 from reports_service.response import server_error
 
+SECURITY_HEADERS = {
+    "Cache-Control": "no-cache, no-store",
+    "Expires": "0",
+    "Pragma": "no-cache",
+    "Access-Control-Allow-Origin": "*",  # FIXME: set origins
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+    "X-Content-Type-Options": "nosniff",
+}
+
 
 class AccessMiddleware(BaseHTTPMiddleware):
 
@@ -80,6 +89,18 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
             return server_error([error])
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: RequestResponseEndpoint,
+    ) -> Response:
+        response = await call_next(request)
+        response.headers.update(SECURITY_HEADERS)
+        return response
+
+
 def add_middlewares(app: FastAPI, request_id_header: str) -> None:
     # do not change order
     app.add_middleware(ExceptionHandlerMiddleware)
@@ -88,6 +109,7 @@ def add_middlewares(app: FastAPI, request_id_header: str) -> None:
         RequestIdMiddleware,
         request_id_header=request_id_header,
     )
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],
