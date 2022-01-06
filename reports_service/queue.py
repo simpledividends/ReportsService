@@ -9,6 +9,7 @@ from aiobotocore.session import ClientCreatorContext
 from pydantic.main import BaseModel
 
 from reports_service.context import REQUEST_ID
+from reports_service.utils import utc_now
 
 MessageBodyContent = tp.Tuple[tp.List[tp.Any], tp.Dict[str, tp.Any], None]
 
@@ -32,31 +33,21 @@ class QueueService(BaseModel):
         )
 
     def _make_message(self, report_id: str, storage_key: str) -> str:
-        msg_body_content: MessageBodyContent = (
-            [],
-            {
-                "report_id": report_id,
-                "storage_key": storage_key,
-                "request_id": REQUEST_ID.get("-"),
-            },
-            None,
-        )
-        msg_body = base64.b64encode(orjson.dumps(msg_body_content)).decode()
-
-        task_id = str(uuid.uuid4())
+        kwargs = {
+            "report_id": report_id,
+            "storage_key": storage_key,
+            "request_id": REQUEST_ID.get("-"),
+        }
+        message_id = str(uuid.uuid4())
+        ts = int(utc_now().timestamp() * 1000)
         msg_content = {
-            "body": msg_body,
-            "content-encoding": "utf-8",
-            "content-type": "application/json",
-            "headers": {
-                "lang": "py",
-                "task": self.parse_task,
-                "id": task_id,
-            },
-            "properties": {
-                "delivery_info": {},
-                "body_encoding": 'base64',
-            }
+            "queue_name": self.queue_name,
+            "actor_name": self.parse_task,
+            "args": [],
+            "kwargs": kwargs,
+            "options": {},
+            "message_id": message_id,
+            "message_timestamp": ts,
         }
         msg = base64.b64encode(orjson.dumps(msg_content)).decode()
         return msg
@@ -64,6 +55,10 @@ class QueueService(BaseModel):
     @property
     def queue_url(self) -> str:
         return urljoin(self.endpoint_url, self.queue_path)
+
+    @property
+    def queue_name(self) -> str:
+        return self.queue_path.split("/")[-1]
 
     async def send_parse_message(self, report_id: uuid.UUID, key: str) -> None:
         msg = self._make_message(str(report_id), key)

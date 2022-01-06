@@ -120,23 +120,25 @@ def test_upload_report_success(
             QueueUrl=sqs_queue_url,
             MaxNumberOfMessages=10,
         )
-        .get('Messages', [])
+        .get("Messages", [])
     )
     assert len(messages) == 1
     message = messages[0]
     msg_content = orjson.loads(base64.b64decode(message["Body"].encode()))
-    headers = msg_content["headers"]
-    assert headers["task"] == service_config.queue_config.parse_task
-    assert headers["id"] == AnyUUID()
-    msg_body = msg_content["body"]
-    msg_body_content = orjson.loads(base64.b64decode(msg_body.encode()))
-    msg_body_kwargs = msg_body_content[1]
-    expected_body_kwargs = {
-        "storage_key": key,
-        "request_id": request_id,
-        "report_id": str(report.report_id),
-        }
-    assert msg_body_kwargs == expected_body_kwargs
+    expected_msg_content = {
+        "queue_name": sqs_queue_url.split("/")[-1],
+        "actor_name": service_config.queue_config.parse_task,
+        "args": [],
+        "kwargs": {
+            "storage_key": key,
+            "report_id": str(report.report_id),
+            "request_id": request_id,
+        },
+        "options": {},
+        "message_id": AnyUUID(),
+        "message_timestamp": pytest.approx(now.timestamp() * 1000, abs=5_000)
+    }
+    assert msg_content == expected_msg_content
 
 
 def test_upload_report_too_large(
@@ -179,7 +181,7 @@ def test_upload_report_too_large(
             QueueUrl=sqs_queue_url,
             MaxNumberOfMessages=10,
         )
-        .get('Messages', [])
+        .get("Messages", [])
     )
     assert len(messages) == 0
 
