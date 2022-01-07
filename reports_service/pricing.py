@@ -20,8 +20,28 @@ def linear_with_min_threshold_calculator(
     return price
 
 
+def thresholds_calculator(
+    parsed_report: ParsedReport,
+    n_rows_thresholds: tp.List[int],
+    prices: tp.List[float],
+) -> float:
+    if len(n_rows_thresholds) != len(prices) - 1:
+        raise ValueError("Must be: len(n_rows_thresholds) == len(prices) - 1")
+    if sorted(n_rows_thresholds) != n_rows_thresholds:
+        raise ValueError("n_rows_thresholds must be sorted")
+    n_rows = len(parsed_report.rows)
+    for i, n_rows_thr in enumerate(n_rows_thresholds):
+        if n_rows <= n_rows_thr:
+            price = prices[i]
+            break
+    else:
+        price = prices[-1]
+    return price
+
+
 calculators = {
     "linear_with_min_threshold": linear_with_min_threshold_calculator,
+    "thresholds": thresholds_calculator,
 }
 
 
@@ -42,6 +62,9 @@ class PriceService(BaseModel):
             raise RuntimeError("No appropriate price strategy")
 
         calculator = calculators[calculator_name]
-        float_price = calculator(parsed_report, **calculator_params)
+        float_price = calculator(  # type: ignore
+            parsed_report,
+            **calculator_params,
+        )
         price = Decimal(str(round(float_price, 2)))
         return price

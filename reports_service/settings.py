@@ -93,8 +93,11 @@ class PriceConfig(Config):
     strategies: tp.List[PriceStrategy] = [  # ordered by date
         PriceStrategy(
             started_at=datetime(2021, 6, 30),
-            calculator="linear_with_min_threshold",
-            params={"min_threshold": 100, "row_price": 1},
+            calculator="thresholds",
+            params={
+                "n_rows_thresholds": [10, 30, 100],
+                "prices": [0, 100, 200, 300],
+            },
         ),
     ]
 
