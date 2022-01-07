@@ -324,11 +324,18 @@ def test_upload_report_forbidden_whet_not_service_role(
     assert_forbidden(resp, "forbidden")
 
 
+_PS = PaymentStatus
+
+
 @pytest.mark.parametrize(
-    "path,model",
+    "path,model,payment_status,price",
     (
-        (GET_REPORT_ROWS_PATH, SimpleReportRow),
-        (GET_DETAILED_REPORT_ROWS_PATH, DetailedReportRow),
+        (GET_REPORT_ROWS_PATH, SimpleReportRow, _PS.payed, 100),
+        (GET_REPORT_ROWS_PATH, SimpleReportRow, _PS.not_payed, 100),
+        (GET_DETAILED_REPORT_ROWS_PATH, DetailedReportRow, _PS.payed, 100),
+        (GET_DETAILED_REPORT_ROWS_PATH, DetailedReportRow, _PS.not_payed, 0),
+        (GET_DETAILED_REPORT_ROWS_PATH, DetailedReportRow, _PS.error, 0),
+        (GET_DETAILED_REPORT_ROWS_PATH, DetailedReportRow, _PS.in_progress, 0),
     )
 )
 @pytest.mark.parametrize("n_rows", (3, 0))
@@ -341,6 +348,8 @@ def test_get_report_rows_success(
     model: tp.Type,
     n_rows: int,
     year: tp.Optional[int],
+    payment_status: PaymentStatus,
+    price: float,
 ) -> None:
     user_id = uuid4()
     report_id = uuid4()
@@ -356,7 +365,8 @@ def test_get_report_rows_success(
         other_report_id,
         user_id=user_id,
         parse_status=ParseStatus.parsed,
-        payment_status=PaymentStatus.payed,
+        payment_status=payment_status,
+        price=Decimal(price),
     )
     create_db_object(other_report)
     for i in range(1, n_rows + 1):
@@ -549,6 +559,7 @@ def test_get_report_detailed_rows_when_not_payed(
         user_id=user_id,
         parse_status=ParseStatus.parsed,
         payment_status=payment_status,
+        price=Decimal(1),
     )
     create_db_object(report)
     access_token = "some_token"

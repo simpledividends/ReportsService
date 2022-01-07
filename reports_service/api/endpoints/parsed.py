@@ -162,7 +162,7 @@ async def get_report_detailed_rows(
         raise ForbiddenException()
     if report.parse_status != ParseStatus.parsed:
         raise NotParsedException()
-    if report.payment_status != PaymentStatus.payed:
+    if report.payment_status != PaymentStatus.payed and report.price > 0:
         raise NotPayedException()
 
     rows = await db_service.get_report_detailed_rows(report_id, year)
