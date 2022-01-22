@@ -2,6 +2,7 @@ import base64
 import os.path
 import typing as tp
 from datetime import date, datetime
+from decimal import Decimal
 from http import HTTPStatus
 from operator import itemgetter
 from tempfile import NamedTemporaryFile
@@ -85,6 +86,7 @@ def test_upload_report_success(
         "year": None,
         "parse_note": None,
         "parser_version": None,
+        "is_ready_to_use": False,
     }
 
     # Check DB content
@@ -92,6 +94,7 @@ def test_upload_report_success(
     reports = db_session.query(ReportsTable).all()
     assert len(reports) == 1
     report = reports[0]
+    resp_json.pop("is_ready_to_use")
     report_dict = orjson.loads(
         orjson.dumps(
             {k: getattr(report, k) for k in resp_json.keys() if k != "period"}
@@ -265,7 +268,7 @@ def test_get_reports_success(
     user_1_id = uuid4()
     user_2_id = uuid4()
 
-    # Report 1 has no rows
+    # Report 1 has no rows, not parsed, not payed
     create_db_object(make_db_report(user_id=user_1_id, filename="rep_1"))
 
     # Report 2 has rows in 1 year
@@ -296,6 +299,37 @@ def test_get_reports_success(
     # Report 5 is foreign
     create_db_object(make_db_report(user_id=user_2_id, filename="rep_5"))
 
+    # Report 6, parsed, not payed, positive price
+    create_db_object(
+        make_db_report(
+            user_id=user_1_id,
+            filename="rep_6",
+            parse_status=ParseStatus.parsed,
+            price=Decimal(100),
+        )
+    )
+
+    # Report 7, parsed, payed, positive price
+    create_db_object(
+        make_db_report(
+            user_id=user_1_id,
+            filename="rep_7",
+            parse_status=ParseStatus.parsed,
+            payment_status=PaymentStatus.payed,
+            price=Decimal(100),
+        )
+    )
+
+    # Report 8, parsed, not payed, zero price
+    create_db_object(
+        make_db_report(
+            user_id=user_1_id,
+            filename="rep_8",
+            parse_status=ParseStatus.parsed,
+            price=Decimal(0),
+        )
+    )
+
     access_token = "some_token"
     fake_auth_server.add_ok_response(access_token, user_1_id)
 
@@ -310,7 +344,9 @@ def test_get_reports_success(
     sorted_reports = sorted(resp.json()["reports"], key=itemgetter("filename"))
 
     report_names = [r["filename"] for r in sorted_reports]
-    assert report_names == ["rep_1", "rep_2", "rep_3"]
+    assert report_names == [
+        "rep_1", "rep_2", "rep_3", "rep_6", "rep_7", "rep_8",
+    ]
 
     for report in sorted_reports:
         expected_keys = DetailedReport.schema()["properties"].keys()
@@ -322,6 +358,12 @@ def test_get_reports_success(
         {"year": 2020, "n_rows": 3},
         {"year": 2021, "n_rows": 2}
     ]
+
+    for i in range(4):  # rep_1, rep_2, rep_3, rep_6
+        assert not sorted_reports[i]["is_ready_to_use"]
+
+    for i in range(4, 6):
+        assert sorted_reports[i]["is_ready_to_use"]
 
 
 def test_get_reports_when_no_user_reports(
@@ -417,6 +459,7 @@ def test_get_report_success(
         "parse_note": None,
         "parser_version": None,
         "parts": expected_parts,
+        "is_ready_to_use": False,
     }
 
 

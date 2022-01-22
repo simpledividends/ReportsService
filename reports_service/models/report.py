@@ -4,6 +4,7 @@ from decimal import Decimal
 from enum import Enum
 from uuid import UUID
 
+from pydantic import validator
 from pydantic.main import BaseModel
 
 Period = tp.Tuple[date, date]
@@ -30,6 +31,23 @@ class BaseReportInfo(BaseModel):
     payment_status: PaymentStatus
     parse_status: ParseStatus
     price: tp.Optional[Decimal]
+    is_ready_to_use: bool = False
+
+    @validator("is_ready_to_use", always=True)
+    def define_is_parsed(  # pylint: disable=no-self-argument
+        cls,
+        value: tp.Optional[bool],
+        values: tp.Dict[str, tp.Any],
+        **kwargs,
+    ):
+        is_ready = (
+            values["parse_status"] == ParseStatus.parsed
+            and (
+                values["payment_status"] == PaymentStatus.payed
+                or values["price"] == 0
+            )
+        )
+        return is_ready
 
 
 class ParsedReportRow(BaseModel):
