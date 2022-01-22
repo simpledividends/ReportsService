@@ -194,6 +194,7 @@ def make_db_report_row(
         tax_payment_date=income_date,
         payed_tax_amount=2.3,
         tax_payment_currency_rate=77.7,
+        currency_code="840",
     )
 
 
@@ -226,6 +227,7 @@ def make_report_row(
         name="name",
         tax_rate="13",
         country_code="840",
+        currency_code="840",
         income_amount=15.3,
         income_date=date(2020, 10, 16),
         income_currency_rate=77.7,

@@ -162,6 +162,7 @@ class DBService(BaseModel):
                     , name
                     , tax_rate
                     , country_code
+                    , currency_code
                     , income_amount
                     , income_date
                     , income_currency_rate
@@ -177,12 +178,13 @@ class DBService(BaseModel):
                     , $4::VARCHAR
                     , $5::VARCHAR
                     , $6::VARCHAR
-                    , $7::FLOAT
-                    , $8::DATE
-                    , $9::FLOAT
-                    , $10::DATE
-                    , $11::FLOAT
+                    , $7::VARCHAR
+                    , $8::FLOAT
+                    , $9::DATE
+                    , $10::FLOAT
+                    , $11::DATE
                     , $12::FLOAT
+                    , $13::FLOAT
                 )
         """
         values = (
@@ -193,6 +195,7 @@ class DBService(BaseModel):
                 row.name,
                 row.tax_rate,
                 row.country_code,
+                row.currency_code,
                 row.income_amount,
                 row.income_date,
                 row.income_currency_rate,
@@ -274,6 +277,7 @@ class DBService(BaseModel):
                 isin || ' ' || name AS name_full
                 , tax_rate
                 , country_code
+                , currency_code
                 , income_amount
                 , income_date
                 , income_currency_rate

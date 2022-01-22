@@ -25,6 +25,7 @@ def upgrade():
         sa.Column("name", VARCHAR(256), nullable=False),
         sa.Column("tax_rate", VARCHAR(8), nullable=False),
         sa.Column("country_code", VARCHAR(8), nullable=False),
+        sa.Column("currency_code", VARCHAR(8), nullable=False),
         sa.Column("income_amount", FLOAT, nullable=False),
         sa.Column("income_date", DATE, nullable=False),
         sa.Column("income_currency_rate", FLOAT, nullable=False),

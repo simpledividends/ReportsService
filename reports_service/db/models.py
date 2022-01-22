@@ -58,6 +58,7 @@ class ReportRowsTable(Base):
     name = Column(pg.VARCHAR(256), nullable=False)
     tax_rate = Column(pg.VARCHAR(8), nullable=False)
     country_code = Column(pg.VARCHAR(8), nullable=False)
+    currency_code = Column(pg.VARCHAR(8), nullable=False)
     income_amount = Column(pg.FLOAT, nullable=False)
     income_date = Column(pg.DATE, nullable=False)
     income_currency_rate = Column(pg.FLOAT, nullable=False)

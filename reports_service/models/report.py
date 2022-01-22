@@ -55,6 +55,7 @@ class ParsedReportRow(BaseModel):
     name: str
     tax_rate: str
     country_code: str
+    currency_code: str
     income_amount: float
     income_date: date
     income_currency_rate: float
@@ -123,6 +124,7 @@ class DetailedReportRow(BaseModel):
     name_full: str
     tax_rate: str
     country_code: str
+    currency_code: str
     income_amount: float
     income_date: date
     income_currency_rate: float
