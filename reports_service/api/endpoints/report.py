@@ -2,7 +2,7 @@ import typing as tp
 from http import HTTPStatus
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Response, UploadFile
 from starlette.requests import Request
 
 from reports_service.api import responses
@@ -170,7 +170,7 @@ async def delete_report(
     request: Request,
     report_id: UUID,
     user: User = Depends(get_request_user),
-) -> None:
+) -> Response:
     app_logger.info(f"User {user.user_id} want to delete report {report_id}")
 
     db_service = get_db_service(request.app)
@@ -185,3 +185,4 @@ async def delete_report(
     await db_service.set_report_deleted(report_id)
 
     app_logger.info(f"Report {report_id} was deleted")
+    return Response(status_code=HTTPStatus.NO_CONTENT.value)
