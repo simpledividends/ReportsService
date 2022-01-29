@@ -220,6 +220,7 @@ async def accept_yookassa_webhook(
         payment_status = PaymentStatus.payed
     elif event == YookassaEvent.cancelled:
         cancellation_details = body.object["cancellation_details"]
+        app_logger.info(f"Cancellation_details: {cancellation_details}")
         if cancellation_details["reason"] in USER_PAYMENT_CANCELLATION_REASONS:
             payment_status = PaymentStatus.not_payed
         else:
