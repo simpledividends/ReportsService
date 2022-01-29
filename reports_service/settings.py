@@ -4,9 +4,6 @@ from datetime import datetime
 from pydantic import BaseSettings, PostgresDsn, validator
 from pydantic.main import BaseModel
 
-import os
-
-print(os.environ["PRICE_STRATEGIES"])
 
 class Config(BaseSettings):
 
@@ -114,7 +111,6 @@ class PriceConfig(Config):
     class Config:
         case_sensitive = False
         env_prefix = "PRICE_"
-
 
 
 # product_code is None as I do not need marking
