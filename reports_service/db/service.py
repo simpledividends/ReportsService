@@ -329,7 +329,7 @@ class DBService(BaseModel):
     async def get_promocode(
         self,
         promo_code: str,
-    ) -> Promocode:
+    ) -> tp.Optional[Promocode]:
         query = """
             SELECT *
             FROM promocodes

@@ -16,21 +16,43 @@ from reports_service.api.exceptions import (
     NotFoundException,
     NotParsedException,
 )
+from reports_service.db.service import DBService
 from reports_service.log import app_logger
 from reports_service.models.payment import (
     Price,
-    PromocodeUsage,
     YookassaEvent,
     YookassaEventBody,
 )
-from reports_service.models.report import ParseStatus, PaymentStatus
+from reports_service.models.report import ParseStatus, PaymentStatus, Report
 from reports_service.models.user import User
+from reports_service.pricing import PriceService
 from reports_service.response import create_response
-from reports_service.services import get_db_service, get_payment_service
+from reports_service.services import (
+    get_db_service,
+    get_payment_service,
+    get_price_service,
+)
 
 router = APIRouter()
 
 USER_PAYMENT_CANCELLATION_REASONS = ("expired_on_confirmation",)
+
+
+async def _get_report_price(
+    report: Report,
+    promo: tp.Optional[str],
+    db_service: DBService,
+    price_service: PriceService,
+) -> Price:
+    promocode_not_exist = False
+    promocode = None
+    if promo is not None:
+        promo = promo.upper()
+        promocode = await db_service.get_promocode(promo)
+        if promocode is None:
+            promocode_not_exist = True
+    price = price_service.get_price(report, promocode, promocode_not_exist)
+    return price
 
 
 @router.get(
@@ -70,18 +92,13 @@ async def get_report_price(
             error_message="Price not set for this report (yet)",
         )
 
-    if promo is not None:
-        promo_code = promo.upper()
-        promocode = await db_service.get_promocode(promo_code)
-        payment_service = get_payment_service(request.app)
-        price = payment_service.get_price_with_promocode(report, promocode)
-    else:
-        price = Price(
-            start_price=report.price,
-            final_price=report.price,
-            discount=0,
-            promocode_usage=PromocodeUsage.not_set,
-        )
+    price = await _get_report_price(
+        report=report,
+        promo=promo,
+        db_service=db_service,
+        price_service=get_price_service(request.app),
+    )
+
     app_logger.info(f"Got price: {price}")
 
     return price
@@ -99,7 +116,7 @@ class CreatedPayment(BaseModel):
     responses={
         403: responses.forbidden,
         404: responses.not_found,
-        409: responses.not_parsed_or_payed,
+        409: responses.not_parsed_or_payed_or_no_price,
     }
 )
 async def create_payment(
@@ -123,11 +140,17 @@ async def create_payment(
         raise ForbiddenException()
     if report.parse_status != ParseStatus.parsed:
         raise NotParsedException()
+    if report.price is None:
+        raise AppException(
+            status_code=HTTPStatus.CONFLICT,
+            error_key="no_price",
+            error_message="Price not set for this report (yet)",
+        )
     if report.payment_status == PaymentStatus.payed:
         raise AppException(
             status_code=HTTPStatus.CONFLICT,
             error_key="report_already_payed",
-            error_message="Report already payed",
+            error_message="Report is already payed",
         )
     if report.payment_status == PaymentStatus.in_progress:
         raise AppException(
@@ -136,16 +159,18 @@ async def create_payment(
             error_message="Report payment in progress",
         )
 
-    if promo is not None:
-        promocode = await db_service.get_promocode(promo.upper())
-    else:
-        promocode = None
+    price = await _get_report_price(
+        report=report,
+        promo=promo,
+        db_service=db_service,
+        price_service=get_price_service(request.app),
+    )
 
     payment_service = get_payment_service(request.app)
     confirmation_url, body = await payment_service.create_payment(
         user,
         report,
-        promocode,
+        price,
     )
 
     metadata = body["metadata"]
@@ -195,6 +220,7 @@ async def accept_yookassa_webhook(
         payment_status = PaymentStatus.payed
     elif event == YookassaEvent.cancelled:
         cancellation_details = body.object["cancellation_details"]
+        app_logger.info(f"Cancellation_details: {cancellation_details}")
         if cancellation_details["reason"] in USER_PAYMENT_CANCELLATION_REASONS:
             payment_status = PaymentStatus.not_payed
         else:

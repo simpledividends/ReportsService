@@ -109,7 +109,26 @@ too_large = {
 }
 
 
-not_parsed_or_payed = {
+no_price = {
+    "model": ErrorResponse,
+    "description": "Error: Report does not have price",
+    "content": {
+        "application/json": {
+            "example": ErrorResponse(
+                errors=[
+                    Error(
+                        error_key="no_price",
+                        error_message="Price not set for this report (yet)",
+                        error_loc=None,
+                    ),
+                ],
+            ),
+        },
+    },
+}
+
+
+not_parsed_or_payed_or_no_price = {
     "model": ErrorResponse,
     "description": "Error: Report not found or payed",
     "content": {
@@ -123,7 +142,7 @@ not_parsed_or_payed = {
                     ),
                     Error(
                         error_key="report_already_payed",
-                        error_message="Report already payed",
+                        error_message="Report is already payed",
                         error_loc=None,
                     ),
                     Error(
@@ -131,20 +150,6 @@ not_parsed_or_payed = {
                         error_message="Report payment in progress",
                         error_loc=None,
                     ),
-                ],
-            ),
-        },
-    },
-}
-
-
-no_price = {
-    "model": ErrorResponse,
-    "description": "Error: Report does not have price",
-    "content": {
-        "application/json": {
-            "example": ErrorResponse(
-                errors=[
                     Error(
                         error_key="no_price",
                         error_message="Price not set for this report (yet)",
