@@ -4,8 +4,10 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
-from reports_service.models.report import ParsedReport
+from reports_service.utils import utc_now
 
+from .models.payment import Price, Promocode, PromocodeUsage
+from .models.report import ParsedReport, Report
 from .settings import PriceStrategy
 
 
@@ -67,4 +69,49 @@ class PriceService(BaseModel):
             **calculator_params,
         )
         price = Decimal(str(round(float_price, 2)))
+        return price
+
+    def get_price(
+        self,
+        report: Report,
+        promocode: tp.Optional[Promocode],
+        promocode_not_exist: bool = False,
+    ) -> Price:
+        discount = 0
+        now = utc_now()
+
+        if promocode is None:
+            if promocode_not_exist:
+                promocode_usage = PromocodeUsage.not_exist
+            else:
+                promocode_usage = PromocodeUsage.not_set
+        elif (
+            promocode.rest_usages <= 0
+            or (
+                promocode.user_id is not None
+                and promocode.user_id != report.user_id
+            )
+        ):
+            promocode_usage = PromocodeUsage.not_exist
+        elif promocode.valid_from > now or promocode.valid_to < now:
+            promocode_usage = PromocodeUsage.expired
+        else:
+            discount = promocode.discount
+            promocode_usage = PromocodeUsage.success
+
+        final_price_float = float(report.price) * (1 - discount / 100)
+        final_price = Decimal(str(round(final_price_float, 2)))
+
+        if promocode_usage == PromocodeUsage.success:
+            used_promocode = promocode.promocode
+        else:
+            used_promocode = None
+
+        price = Price(
+            start_price=report.price,
+            final_price=final_price,
+            discount=discount,
+            promocode_usage=promocode_usage,
+            used_promocode=used_promocode,
+        )
         return price

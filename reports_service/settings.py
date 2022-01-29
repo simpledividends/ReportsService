@@ -4,6 +4,9 @@ from datetime import datetime
 from pydantic import BaseSettings, PostgresDsn, validator
 from pydantic.main import BaseModel
 
+import os
+
+print(os.environ["PRICE_STRATEGIES"])
 
 class Config(BaseSettings):
 
@@ -89,7 +92,6 @@ class PriceStrategy(BaseModel):
 
 
 class PriceConfig(Config):
-    # TODO: think about it
     strategies: tp.List[PriceStrategy] = [  # ordered by date
         PriceStrategy(
             started_at=datetime(2021, 6, 30),
@@ -109,17 +111,27 @@ class PriceConfig(Config):
         ),
     ]
 
+    class Config:
+        case_sensitive = False
+        env_prefix = "PRICE_"
 
+
+
+# product_code is None as I do not need marking
+# https://docs.cntd.ru/document/557297080
+# vat_code == 1 (no NDS) as I'm on USN
+# https://www.nalog.gov.ru/rn77/TAXATION/TAXES/NDS/
+# payment_subject == "service", but I'm not sure, maybe "commodity" is better
 class PaymentConfig(Config):
     create_payment_url: str
     shop_id: str
     secret_key: str
     return_url: str
     jwt_key: str
-    product_code: str  # TODO: think
-    vat_code: int = 4  # TODO: think
-    payment_subject: str = "service"  # TODO: think
-    payment_mode: str = "full_payment"  # TODO: think
+    product_code: tp.Optional[str] = None
+    vat_code: int = 1
+    payment_subject: str = "service"
+    payment_mode: str = "full_payment"
     aiohttp_pool_size: int = 10
     aiohttp_session_timeout: float = 10
     jwt_algorithm: str = "HS256"

@@ -1,5 +1,4 @@
 import typing as tp
-from decimal import Decimal
 from http import HTTPStatus
 from socket import AF_INET
 from uuid import uuid4
@@ -10,10 +9,9 @@ from pydantic import BaseModel
 
 from .context import REQUEST_ID
 from .log import app_logger
-from .models.payment import Price, Promocode, PromocodeUsage, YookassaEventBody
+from .models.payment import Price, YookassaEventBody
 from .models.report import Report
 from .models.user import User
-from .utils import utc_now
 
 RUBLE_CURRENCY = "RUB"
 PENDING_STATUS = "pending"
@@ -32,7 +30,7 @@ class PaymentService(BaseModel):
     vat_code: int
     payment_subject: str
     payment_mode: str
-    product_code: str
+    product_code: tp.Optional[str]
     aiohttp_pool_size: int
     aiohttp_session_timeout: float
     jwt_algorithm: str
@@ -66,37 +64,26 @@ class PaymentService(BaseModel):
 
     @classmethod
     def _make_payment_description(cls, report: Report) -> str:
-        desc = f"Оплата отчета {report.broker} от {report.created_at}"
+        desc = f"Оплата отчета {report.broker} от {report.created_at} UTC"
         return desc
 
     def _make_body(
         self,
         user: User,
         report: Report,
-        promocode: tp.Optional[Promocode],
+        price: Price,
     ) -> tp.Dict[str, tp.Any]:
-        if report.price is None:
-            raise ValueError(f"Report {report.report_id} price is None")
-
-        price = self.get_price_with_promocode(report, promocode)
-        if (
-            promocode is not None
-            and price.promocode_usage == PromocodeUsage.success
-        ):
-            used_promocode = promocode.promocode
-        else:
-            used_promocode = None
         amount = {
             "value": str(price.final_price),
             "currency": RUBLE_CURRENCY,
         }
-        receipt = {  # TODO: understand and finalize
+        receipt = {
             "customer": {
                 "email": user.email,
             },
             "items": [
                 {
-                    "description": f"Отчет {report.report_id}",
+                    "description": "Плата за обработку отчета",
                     "quantity": "1",
                     "amount": amount,
                     "vat_code": self.vat_code,
@@ -111,7 +98,7 @@ class PaymentService(BaseModel):
             "user_id": str(user.user_id),
             "report_id": str(report.report_id),
             "request_id": REQUEST_ID.get(),
-            "promocode": used_promocode,
+            "promocode": price.used_promocode,
             "token": jwt.encode(token_body, self.jwt_key, self.jwt_algorithm),
         }
         body = {
@@ -132,14 +119,14 @@ class PaymentService(BaseModel):
         self,
         user: User,
         report: Report,
-        promocode: tp.Optional[Promocode],
+        price: Price,
     ) -> tp.Tuple[str, tp.Dict[str, tp.Any]]:
         auth = aiohttp.BasicAuth(login=self.shop_id, password=self.secret_key)
         headers = {
             "Idempotence-Key": str(uuid4()),
             "Content-Type": "application/json",
         }
-        body = self._make_body(user, report, promocode)
+        body = self._make_body(user, report, price)
 
         async with self._get_session().post(
             url=self.create_payment_url,
@@ -178,36 +165,3 @@ class PaymentService(BaseModel):
     ) -> None:
         token = event_body.object["metadata"]["token"]
         jwt.decode(token, self.jwt_key, [self.jwt_algorithm])
-
-    def get_price_with_promocode(
-        self,
-        report: Report,
-        promocode: tp.Optional[Promocode],
-    ) -> Price:
-        discount = 0
-        now = utc_now()
-        if (
-            promocode is None
-            or promocode.rest_usages <= 0
-            or (
-                promocode.user_id is not None
-                and promocode.user_id != report.user_id
-            )
-        ):
-            promocode_usage = PromocodeUsage.not_exist
-        elif promocode.valid_from > now or promocode.valid_to < now:
-            promocode_usage = PromocodeUsage.expired
-        else:
-            discount = promocode.discount
-            promocode_usage = PromocodeUsage.success
-
-        final_price_float = float(report.price) * (1 - discount / 100)
-        final_price = Decimal(str(round(final_price_float, 2)))
-
-        price = Price(
-            start_price=report.price,
-            final_price=final_price,
-            discount=discount,
-            promocode_usage=promocode_usage,
-        )
-        return price
