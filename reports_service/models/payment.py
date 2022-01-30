@@ -39,5 +39,6 @@ class PromocodeUsage(str, Enum):
 class Price(BaseModel):
     start_price: Decimal
     final_price: Decimal
-    discount: int  # in percents
+    discount: int = Field(ge=0, le=100)  # in percents
     promocode_usage: PromocodeUsage
+    used_promocode: tp.Optional[str]

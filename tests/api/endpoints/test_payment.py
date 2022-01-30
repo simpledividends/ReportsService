@@ -58,6 +58,7 @@ def test_get_price_without_promocode(
         "final_price": 156.32,
         "discount": 0,
         "promocode_usage": PromocodeUsage.not_set,
+        "used_promocode": None,
     }
 
 
@@ -77,7 +78,8 @@ def test_get_price_with_valid_promocode(
     create_db_object(report)
 
     promocode_user_id = user_id if promocode_type == "personal" else None
-    create_db_object(make_promocode(user_id=promocode_user_id, discount=15))
+    promocode = make_promocode(user_id=promocode_user_id, discount=15)
+    create_db_object(promocode)
 
     access_token = "some_token"
     fake_auth_server.add_ok_response(access_token, user_id)
@@ -95,6 +97,7 @@ def test_get_price_with_valid_promocode(
         "final_price": 132.87,
         "discount": 15,
         "promocode_usage": PromocodeUsage.success,
+        "used_promocode": promocode.promocode,
     }
 
 
@@ -140,6 +143,7 @@ def test_get_price_with_expired_promocode(
         "final_price": 156.32,
         "discount": 0,
         "promocode_usage": PromocodeUsage.expired,
+        "used_promocode": None,
     }
 
 
@@ -184,6 +188,7 @@ def test_get_price_with_non_existent_promocode(
         "final_price": 156.32,
         "discount": 0,
         "promocode_usage": PromocodeUsage.not_exist,
+        "used_promocode": None,
     }
 
 
@@ -329,14 +334,15 @@ def test_create_payment_success(
             "value": str(report.price),
             "currency": "RUB",
         },
-        "description": f"Оплата отчета {report.broker} от {report.created_at}",
+        "description":
+            f"Оплата отчета {report.broker} от {report.created_at} UTC",
         "receipt": {
             "customer": {
                 "email": "user@ma.il",
             },
             "items": [
                 {
-                    "description": f"Отчет {report.report_id}",
+                    "description": "Плата за обработку отчета",
                     "quantity": "1",
                     "amount": {
                         "value": str(report.price),
@@ -427,14 +433,15 @@ def test_create_payment_success_with_valid_promocode(
             "value": "132.87",
             "currency": "RUB",
         },
-        "description": f"Оплата отчета {report.broker} от {report.created_at}",
+        "description":
+            f"Оплата отчета {report.broker} от {report.created_at} UTC",
         "receipt": {
             "customer": {
                 "email": "user@ma.il",
             },
             "items": [
                 {
-                    "description": f"Отчет {report.report_id}",
+                    "description": "Плата за обработку отчета",
                     "quantity": "1",
                     "amount": {
                         "value": "132.87",
@@ -528,14 +535,15 @@ def test_create_payment_success_with_invalid_promocode(
             "value": str(report.price),
             "currency": "RUB",
         },
-        "description": f"Оплата отчета {report.broker} от {report.created_at}",
+        "description":
+            f"Оплата отчета {report.broker} от {report.created_at} UTC",
         "receipt": {
             "customer": {
                 "email": "user@ma.il",
             },
             "items": [
                 {
-                    "description": f"Отчет {report.report_id}",
+                    "description": "Плата за обработку отчета",
                     "quantity": "1",
                     "amount": {
                         "value": str(report.price),
@@ -715,7 +723,8 @@ def test_create_payment_price_is_null(
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
-    assert resp.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+    assert resp.status_code == HTTPStatus.CONFLICT
+    assert resp.json()["errors"][0]["error_key"] == "no_price"
 
 
 @pytest.mark.parametrize(
