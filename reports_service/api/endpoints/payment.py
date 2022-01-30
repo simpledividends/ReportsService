@@ -116,7 +116,7 @@ class CreatedPayment(BaseModel):
     responses={
         403: responses.forbidden,
         404: responses.not_found,
-        409: responses.not_parsed_or_payed_or_no_price,
+        409: responses.not_parsed_or_payed_or_no_price_or_zero_price,
     }
 )
 async def create_payment(
@@ -159,6 +159,13 @@ async def create_payment(
         db_service=db_service,
         price_service=get_price_service(request.app),
     )
+
+    if price.final_price == 0:
+        raise AppException(
+            status_code=HTTPStatus.CONFLICT,
+            error_key="zero_price",
+            error_message="Report is free",
+        )
 
     payment_service = get_payment_service(request.app)
     confirmation_url, body = await payment_service.create_payment(
@@ -229,6 +236,8 @@ async def accept_yookassa_webhook(
     report = await db_service.get_report(report_id)
     if report is None:
         raise ValueError(f"Report {report_id} not exists")
+
+
     await db_service.update_payment_status(report_id, payment_status)
     app_logger.info("Payment status updated")
 

@@ -128,7 +128,7 @@ no_price = {
 }
 
 
-not_parsed_or_payed_or_no_price = {
+not_parsed_or_payed_or_no_price_or_zero_price = {
     "model": ErrorResponse,
     "description": "Error: Report not found or payed",
     "content": {
@@ -146,13 +146,13 @@ not_parsed_or_payed_or_no_price = {
                         error_loc=None,
                     ),
                     Error(
-                        error_key="report_payment_in_progress",
-                        error_message="Report payment in progress",
+                        error_key="no_price",
+                        error_message="Price not set for this report (yet)",
                         error_loc=None,
                     ),
                     Error(
-                        error_key="no_price",
-                        error_message="Price not set for this report (yet)",
+                        error_key="zero_price",
+                        error_message="Report is free",
                         error_loc=None,
                     ),
                 ],

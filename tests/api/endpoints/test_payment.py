@@ -698,10 +698,19 @@ def test_create_payment_for_already_payed_report(
     assert resp.json()["errors"][0]["error_key"] == error_key
 
 
-def test_create_payment_price_is_null(
+@pytest.mark.parametrize(
+    "price,error_key",
+    (
+        (None, "no_price"),
+        (Decimal(0), "zero_price"),
+    )
+)
+def test_create_payment_price_is_null_or_zero(
     client: TestClient,
     create_db_object: DBObjectCreator,
     fake_auth_server: FakeAuthServer,
+    price: tp.Optional[Decimal],
+    error_key: str,
 ) -> None:
     user_id = uuid4()
     report_id = uuid4()
@@ -711,7 +720,7 @@ def test_create_payment_price_is_null(
             user_id=user_id,
             parse_status=ParseStatus.parsed,
             payment_status=PaymentStatus.not_payed,
-            price=None,
+            price=price,
         )
     )
     access_token = "some_token"
@@ -724,7 +733,7 @@ def test_create_payment_price_is_null(
         )
 
     assert resp.status_code == HTTPStatus.CONFLICT
-    assert resp.json()["errors"][0]["error_key"] == "no_price"
+    assert resp.json()["errors"][0]["error_key"] == error_key
 
 
 @pytest.mark.parametrize(
