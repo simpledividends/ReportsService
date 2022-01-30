@@ -270,7 +270,7 @@ def test_get_price_when_price_is_null(
 
 @pytest.mark.parametrize(
     "payment_status",
-    (PaymentStatus.not_payed, PaymentStatus.error),
+    (PaymentStatus.not_payed, PaymentStatus.error, PaymentStatus.in_progress),
 )
 def test_create_payment_success(
     client: TestClient,
@@ -375,7 +375,7 @@ def test_create_payment_success(
 @pytest.mark.parametrize("promocode_type", ("common", "personal"))
 @pytest.mark.parametrize(
     "payment_status",
-    (PaymentStatus.not_payed, PaymentStatus.error),
+    (PaymentStatus.not_payed, PaymentStatus.error, PaymentStatus.in_progress),
 )
 def test_create_payment_success_with_valid_promocode(
     client: TestClient,
@@ -476,7 +476,7 @@ def test_create_payment_success_with_valid_promocode(
 )
 @pytest.mark.parametrize(
     "payment_status",
-    (PaymentStatus.not_payed, PaymentStatus.error),
+    (PaymentStatus.not_payed, PaymentStatus.error, PaymentStatus.in_progress),
 )
 def test_create_payment_success_with_invalid_promocode(
     client: TestClient,
@@ -657,7 +657,6 @@ def test_create_payment_report_not_parsed(
     "payment_status,error_key",
     (
         (PaymentStatus.payed, "report_already_payed"),
-        (PaymentStatus.in_progress, "report_payment_in_progress"),
     )
 )
 def test_create_payment_for_already_payed_report(

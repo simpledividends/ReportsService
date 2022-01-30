@@ -129,12 +129,6 @@ async def create_payment(
             error_key="report_already_payed",
             error_message="Report already payed",
         )
-    if report.payment_status == PaymentStatus.in_progress:
-        raise AppException(
-            status_code=HTTPStatus.CONFLICT,
-            error_key="report_payment_in_progress",
-            error_message="Report payment in progress",
-        )
 
     if promo is not None:
         promocode = await db_service.get_promocode(promo.upper())
