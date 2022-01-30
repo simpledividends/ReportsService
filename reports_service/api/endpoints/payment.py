@@ -202,7 +202,7 @@ async def create_payment(
     tags=["Payment"],
     status_code=HTTPStatus.OK,
 )
-async def accept_yookassa_webhook(
+async def accept_yookassa_webhook(  # pylint: disable=too-many-branches
     request: Request,
     body: YookassaEventBody,
 ) -> JSONResponse:
@@ -237,9 +237,11 @@ async def accept_yookassa_webhook(
     if report is None:
         raise ValueError(f"Report {report_id} not exists")
 
-
-    await db_service.update_payment_status(report_id, payment_status)
-    app_logger.info("Payment status updated")
+    if report.payment_status != PaymentStatus.payed:
+        await db_service.update_payment_status(report_id, payment_status)
+        app_logger.info("Payment status updated")
+    else:
+        app_logger.info("Report is payed, status is not updated")
 
     if (
         metadata.get("promocode") is not None

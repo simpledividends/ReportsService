@@ -1,4 +1,4 @@
-
+# pylint: disable=too-many-lines
 import typing as tp
 from datetime import timedelta
 from decimal import Decimal
@@ -962,3 +962,53 @@ def test_accept_yookassa_webhook_error_when_report_not_exist(
     reports = db_session.query(ReportsTable).all()
     assert len(reports) == 1
     assert reports[0].payment_status == PaymentStatus.not_payed
+
+
+@pytest.mark.parametrize(
+    "event,cancellation_reason",
+    (
+        ("payment.succeeded", None),
+        ("payment.canceled", "expired_on_confirmation"),
+        ("payment.canceled", "card_expired"),
+    ),
+)
+def test_accept_yookassa_webhook_not_update_payment_status_if_payed(
+    client: TestClient,
+    db_session: orm.Session,
+    service_config: ServiceConfig,
+    create_db_object: DBObjectCreator,
+    event: str,
+    cancellation_reason: tp.Optional[str],
+) -> None:
+    report_id = uuid4()
+    report = make_db_report(report_id, payment_status=PaymentStatus.payed)
+    create_db_object(report)
+    body = {
+        "type": "notification",
+        "event": event,
+        "object": {
+            "id": str(uuid4()),
+            "metadata": {
+                "report_id": str(report_id),
+                "token": jwt.encode(
+                    {},
+                    service_config.payment_config.jwt_key,
+                    service_config.payment_config.jwt_algorithm,
+                )
+            },
+            "cancellation_details": {
+                "reason": cancellation_reason,
+            }
+        }
+    }
+    with client:
+        resp = client.post(
+            ACCEPT_YOOKASSA_WEBHOOK_PATH,
+            json=body,
+        )
+
+    assert resp.status_code == HTTPStatus.OK
+
+    reports = db_session.query(ReportsTable).all()
+    assert len(reports) == 1
+    assert reports[0].payment_status == PaymentStatus.payed
