@@ -124,6 +124,8 @@ class DetailedReportRow(BaseModel):
     name_full: str
     tax_rate: str
     country_code: str
+    source_country_code: str
+    target_country_code: str
     currency_code: str
     income_amount: float
     income_date: date

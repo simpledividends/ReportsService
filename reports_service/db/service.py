@@ -20,6 +20,8 @@ from reports_service.models.report import (
 )
 from reports_service.utils import utc_now
 
+TARGET_COUNTRY_CODE = "643"
+
 
 def convert_period(record: Record) -> tp.Dict[str, tp.Any]:
     record_dict = dict(**record)
@@ -295,7 +297,16 @@ class DBService(BaseModel):
             ORDER BY row_n
         """
         records = await self.pool.fetch(query, report_id, year)
-        return [DetailedReportRow(**record) for record in records]
+
+        rows = [
+            DetailedReportRow(
+                **record,
+                source_country_code=record["country_code"],
+                target_country_code=TARGET_COUNTRY_CODE
+            )
+            for record in records
+        ]
+        return rows
 
     async def set_report_deleted(self, report_id: UUID) -> None:
         query = """

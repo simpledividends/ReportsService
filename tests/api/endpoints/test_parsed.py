@@ -390,6 +390,9 @@ def test_get_report_rows_success(
     expected_keys = model.schema()["properties"].keys()
     for row in rows:
         assert set(row.keys()) == set(expected_keys)
+        if model is DetailedReportRow:
+            assert row["source_country_code"] == row["country_code"]
+            assert row["target_country_code"] == "643"  # Russia
 
     name_key, name = (
         ("name", "a{i}")
