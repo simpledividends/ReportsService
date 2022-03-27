@@ -42,6 +42,7 @@ STANDARD_PARSING_RESULT_BODY: tp.Dict[str, tp.Any] = {
         "rows": [
             make_report_row(isin="isin1").dict(),
             make_report_row(isin="isin2", payed_tax_amount=None).dict(),
+            make_report_row(isin="isin3", country_code="076").dict(),
         ]
     },
     "is_parsed": True,
@@ -125,14 +126,20 @@ def test_upload_parsed_report_success(
     assert report.price == Decimal('0')
 
     # Check rows
-    rows = db_session.query(ReportRowsTable).all()
+    rows = (
+        db_session
+        .query(ReportRowsTable)
+        .order_by(ReportRowsTable.row_n)
+        .all()
+    )
     expected_rows = body["parsed_report"]["rows"]
-    isins = [row.isin for row in rows]
-    expected_isins = [row["isin"] for row in expected_rows]
-    assert sorted(isins) == sorted(expected_isins)
-    row_numbers = [row.row_n for row in rows]
-    assert row_numbers == list(range(1, len(expected_rows) + 1))
+    assert [r.row_n for r in rows] == list(range(1, len(expected_rows) + 1))
 
+    if len(expected_rows) > 0:
+        for field in expected_rows[0].keys():
+            values = [getattr(r, field) for r in rows]
+            expected_values = [r[field] for r in expected_rows]
+            assert values == expected_values
 
 @pytest.mark.parametrize("prev_parsed_exists", (True, False))
 def test_upload_not_parsed_report(

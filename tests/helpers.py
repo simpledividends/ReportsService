@@ -221,12 +221,13 @@ def make_promocode(
 def make_report_row(
     isin: str = "isin",
     payed_tax_amount: tp.Optional[float] = 2.3,
+    country_code: str = "840",
 ) -> ParsedReportRow:
     return ParsedReportRow(
         isin=isin,
         name="name",
         tax_rate="13",
-        country_code="840",
+        country_code=country_code,
         currency_code="840",
         income_amount=15.3,
         income_date=date(2020, 10, 16),
