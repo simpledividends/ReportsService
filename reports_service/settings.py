@@ -106,7 +106,7 @@ class PriceConfig(Config):
                 "prices": [0, 100, 200, 300],
             },
         ),
-         PriceStrategy(
+        PriceStrategy(
             started_at=datetime(2022, 4, 1),
             calculator="thresholds",
             params={

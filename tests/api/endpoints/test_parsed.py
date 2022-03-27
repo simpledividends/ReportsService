@@ -141,6 +141,7 @@ def test_upload_parsed_report_success(
             expected_values = [r[field] for r in expected_rows]
             assert values == expected_values
 
+
 @pytest.mark.parametrize("prev_parsed_exists", (True, False))
 def test_upload_not_parsed_report(
     client: TestClient,
