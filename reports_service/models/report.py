@@ -114,6 +114,7 @@ class SimpleReportRow(BaseModel):
     income_amount: float
     income_date: date
     payed_tax_amount: tp.Optional[float]
+    currency_code: str
 
 
 class SimpleReportRows(BaseModel):

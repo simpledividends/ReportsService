@@ -255,7 +255,13 @@ class DBService(BaseModel):
         year: tp.Optional[int],
     ) -> tp.List[SimpleReportRow]:
         query = """
-            SELECT row_n, name, income_amount, income_date, payed_tax_amount
+            SELECT
+                row_n
+                , name
+                , income_amount
+                , income_date
+                , payed_tax_amount
+                , currency_code
             FROM report_rows rr
                 JOIN reports r on r.report_id = rr.report_id
             WHERE rr.report_id = $1::UUID
