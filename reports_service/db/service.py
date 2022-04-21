@@ -230,12 +230,13 @@ class DBService(BaseModel):
             WHERE report_id = $1::UUID AND is_deleted is False
         """
         if report_info is not None:
+            note = report_info.note
             info_values = (
                 report_info.broker,
                 report_info.period[0],
                 report_info.period[1],
                 report_info.year,
-                report_info.note[:255],
+                note[:255] if note is not None else None,
                 report_info.version,
                 report_info.price,
             )
