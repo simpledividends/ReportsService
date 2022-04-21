@@ -235,7 +235,7 @@ class DBService(BaseModel):
                 report_info.period[0],
                 report_info.period[1],
                 report_info.year,
-                report_info.note,
+                report_info.note[:255],
                 report_info.version,
                 report_info.price,
             )
